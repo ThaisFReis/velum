@@ -1,0 +1,19 @@
+# Seize of 250_000 from a target holding 700_000 spendable + 300_000 receiving.
+# The auditor recovered every witness below from the vk escrow + public events
+# (premise verified in experiments/clawback-poc). alpha is PUBLIC.
+vk = "0x1b856ef983eeeed3263adfdfe6c08bfc96d941f2875be323f5fa9f057d54bcb6"
+v_s = "700000"
+r_s = "0x2ef219912aa95876104034d04ea624816ec9bf9e765d25615925f229b0b3ffce"
+v_r = "300000"
+r_r = "0x0b0c0d0e0f101112131415161718191a"
+pvk_a_x = "0x118a25c8a4b9e49eb56adceabd5d699e8f7addb36b612278a5e0a90390f44ce2"
+pvk_a_y = "0x063b4047da5190303d0721dc556e0e5a0a9606d999cbf1df3121a3956469273c"
+c_spend_x = "0x2eefc4da6e371f7a934c527dd2ccd268e517965d6a73d7e47d8fdf1fc68c8f9a"
+c_spend_y = "0x11a8e83a7c4806df3eecf499f1885882a89e53c3382e21ff20a9bb2e71d901e6"
+c_receive_x = "0x177bfdcf0e687dca20a5685ad56b9e12a4af41d990fe69908dc2c749cc9f1c90"
+c_receive_y = "0x2af554f210a22f01ed9eecb2c437ebb3a4889081b5450c93e98f5f5c80df51f6"
+alpha = "250000"
+sigma_new = "0x1112131415161718191a1b1c1d1e1f20"
+c_spend_new_x = "0x008912196c4698cfff5e14621c1cc18b40270e7f92141e831dda8596295b4341"
+c_spend_new_y = "0x029adaffbe5c4097f9d452d8ba015eeb6b0a9306e4cc3578f44fec84cb090e19"
+b_tilde_new = "0x23aa582ddde65a2634b813c774a19b146ed7e5ec50ee0982d39be232a8445a49"

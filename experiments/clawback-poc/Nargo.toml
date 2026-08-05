@@ -1,0 +1,11 @@
+[package]
+name = "clawback_poc"
+type = "bin"
+authors = ["velum"]
+compiler_version = ">=0.30.0"
+
+# Path-depends on a local checkout of OpenZeppelin/stellar-contracts at the
+# `feat/confidential-verifier-ultrahonk` branch (same convention as
+# circuits/disclose_balance_ge). `refs/` is placed by the repo setup.
+[dependencies]
+stellar_confidential_lib = { path = "../../refs/oz-stellar-contracts-ct-branch/packages/tokens/src/confidential/circuits/lib" }

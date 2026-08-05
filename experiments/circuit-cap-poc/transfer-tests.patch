@@ -1,0 +1,79 @@
+--- /home/dalekthai/Documentos/Workspace/velum/refs/oz-stellar-contracts-main/packages/tokens/src/confidential/circuits/transfer/src/tests.nr	2026-08-04 15:06:16.386306545 -0300
++++ transfer/src/tests.nr	2026-08-04 20:39:21.929488698 -0300
+@@ -254,6 +254,9 @@
+         r_tilde_aud_r_in,
+         v_tilde_aud_s_in,
+         b_tilde_aud_s_in,
++        // VELUM: permissive limits so pre-existing tests keep their meaning
++        0x7fffffffffffffffffffffffffffffff, // cap_transfer = 2^127 - 1
++        0,                                  // min_ticket
+     );
+ }
+ 
+@@ -1310,3 +1313,66 @@
+         B_TILDE_AUD_S + 1,
+     );
+ }
++
++// ---------- VELUM: quantitative compliance over encrypted values ----------
++fn run_with_limits(cap_transfer: Field, min_ticket: Field) {
++    main(
++        SK,
++        V,
++        R,
++        V_TRANSFER,
++        R_E,
++        C_SPEND_X,
++        C_SPEND_Y,
++        Y_X,
++        Y_Y,
++        PVK_B_X,
++        PVK_B_Y,
++        ADDR_F,
++        K_AUD_R_X,
++        K_AUD_R_Y,
++        K_AUD_S_X,
++        K_AUD_S_Y,
++        C_SPEND_NEW_X,
++        C_SPEND_NEW_Y,
++        C_TRANSFER_X,
++        C_TRANSFER_Y,
++        R_E_X,
++        R_E_Y,
++        V_TILDE,
++        B_TILDE,
++        SIGMA,
++        V_TILDE_AUD_R,
++        R_TILDE_AUD_R,
++        V_TILDE_AUD_S,
++        B_TILDE_AUD_S,
++        cap_transfer,
++        min_ticket,
++    );
++}
++
++#[test]
++fn velum_accepts_transfer_within_limits() {
++    // cap exactly at the transferred amount, minimum exactly at it: both bind, both hold.
++    run_with_limits(V_TRANSFER, V_TRANSFER);
++}
++
++#[test(should_fail)]
++fn velum_rejects_transfer_above_cap() {
++    // V1: cap = V_TRANSFER - 1 -> (cap - v_transfer) underflows the 127-bit range.
++    // The verifier never learns v_transfer; it only learns the proof did not satisfy the cap.
++    run_with_limits(V_TRANSFER - 1, 0);
++}
++
++#[test(should_fail)]
++fn velum_rejects_ticket_below_minimum() {
++    // V2: minimum ticket one unit above the transfer -> qualified-investor floor rejects it.
++    run_with_limits(0x7fffffffffffffffffffffffffffffff, V_TRANSFER + 1);
++}
++
++#[test]
++fn velum_diag_cap_only_exact() { run_with_limits(V_TRANSFER, 0); }
++#[test]
++fn velum_diag_min_only_exact() { run_with_limits(0x7fffffffffffffffffffffffffffffff, V_TRANSFER); }
++#[test]
++fn velum_diag_cap_loose() { run_with_limits(V_TRANSFER + 1, 0); }

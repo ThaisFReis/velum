@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = ["velum-policy", "velum-attest"]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+license = "MIT"
+
+# The confidential-token, RWA, access-control and proc-macro crates come from
+# OpenZeppelin/stellar-contracts. The confidential token lives only on the
+# `feat/confidential-verifier-ultrahonk` branch, and that branch also carries the
+# `rwa` module — so a single branch supplies both halves of the bridge.
+#
+# NOTE: `stellar-tokens` pulls in soroban-sdk's `experimental_spec_shaking_v2`
+# feature transitively, so these contracts MUST be built with
+# `stellar contract build` (stellar-cli >= 25.2.0), not plain `cargo build`.
+[workspace.dependencies]
+soroban-sdk = { version = "=26.1.0" }
+stellar-access = { git = "https://github.com/OpenZeppelin/stellar-contracts", rev = "539968f158e0d779f584de2821090f715a3b25e1" }
+stellar-macros = { git = "https://github.com/OpenZeppelin/stellar-contracts", rev = "539968f158e0d779f584de2821090f715a3b25e1" }
+stellar-tokens = { git = "https://github.com/OpenZeppelin/stellar-contracts", rev = "539968f158e0d779f584de2821090f715a3b25e1" }
+stellar-contract-utils = { git = "https://github.com/OpenZeppelin/stellar-contracts", rev = "539968f158e0d779f584de2821090f715a3b25e1" }
+
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+debug = 0
+strip = "symbols"
+debug-assertions = false
+panic = "abort"
+codegen-units = 1
+lto = true

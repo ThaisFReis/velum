@@ -1,0 +1,24 @@
+--- /home/dalekthai/Documentos/Workspace/velum/refs/oz-stellar-contracts-main/packages/tokens/src/confidential/circuits/transfer/src/main.nr	2026-08-04 15:06:16.386306545 -0300
++++ transfer/src/main.nr	2026-08-04 20:36:56.572506239 -0300
+@@ -167,6 +167,9 @@
+     r_tilde_aud_r: pub Field,
+     v_tilde_aud_s: pub Field,
+     b_tilde_aud_s: pub Field,
++    // VELUM: regulatory limits, PUBLIC inputs read from the on-chain profile
++    cap_transfer: pub Field,
++    min_ticket: pub Field,
+ ) {
+     // T13 -- runs first so the r_e = 0 attack is rejected before any
+     // scalar mul against it could quietly produce the identity.
+@@ -193,6 +196,11 @@
+     let v_new = v - v_transfer;
+     v_new.assert_max_bit_size::<127>();
+ 
++    // VELUM V1 -- v_transfer <= cap_transfer (per-operation cap)
++    (cap_transfer - v_transfer).assert_max_bit_size::<127>();
++    // VELUM V2 -- v_transfer >= min_ticket (qualified-investor minimum)
++    (v_transfer - min_ticket).assert_max_bit_size::<127>();
++
+     // T6
+     let r_e_derived = scalar_mul(r_e, H);
+     assert(r_e_derived.x == r_e_x);

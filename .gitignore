@@ -1,0 +1,25 @@
+# Referências externas (clones de estudo — não são trabalho original do bounty)
+refs/
+
+# Documentos internos do time: estratégia, briefs, material de negócio.
+# Não fazem parte da submissão.
+internal/
+
+# Builds
+target/
+node_modules/
+.next/
+dist/
+*.wasm
+
+# Artefatos de circuito gerados (reproduzíveis via nargo/bb — ver circuits/README.md)
+circuits/*/target/
+experiments/*/target/
+
+# Segredos e ambiente
+.env
+.env.*
+*.secret
+
+# SO / editor
+.DS_Store
