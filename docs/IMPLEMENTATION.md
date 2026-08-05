@@ -149,6 +149,29 @@ The token was created through upstream's own factory (`deploy_compliant_token`) 
 address; the deployment event records `policy = CCCQ7Z6F…OXQXDK, sac_passthrough: true`. Nothing
 upstream was modified to make this work.
 
+### Three distinct outcomes, all on the gated token
+
+The same probe, three states of the world:
+
+| Wallet / state | Result |
+|---|---|
+| Alice — KYC claim, not frozen | accepted (`register` tx `d9a1a33c…8fd7`; on repeat runs, a policy-gated deposit) |
+| Alice — **frozen by the issuer** | `#3601 AccountFrozen` |
+| Bob — no identity | `#3602 NotAuthorizedByPolicy` |
+
+Freeze was exercised end to end: `freeze(velum-alice)` emitted `Frozen`, `is_frozen` returned
+`true`, her next gated operation failed with 3601 — distinguishable from a policy refusal — and
+`unfreeze` restored her. The issuer control and the identity gate are independent and both work.
+
+### A demo bug worth recording
+
+The first version of `demo-gate.ts` was not idempotent, and worse, it misattributed the failure.
+On a second run Alice fails with `#3500 AccountAlreadyRegistered`, and the script's catch-all
+labelled every failure "refused by policy" — so a judge running it twice would have seen our own
+gate appear to reject an authorized wallet. Fixed: the script probes with `register` when the
+account is new and with a policy-gated `deposit` when it is not, and it names the actual error
+code in every branch.
+
 ## 3. Circuits
 
 | Package | Tests | Cost | Proof |
@@ -250,6 +273,16 @@ Five, all with reproduction.
    `CountryRelation::Organization` profile is stored as a natural person.
 
 ---
+
+## 6.1 Regulatory profile
+
+`profiles/cvm175.json` expresses the jurisdiction as configuration. Audited against what is
+actually enforced, which turned up an overclaim of our own: the minimum position was marked
+`enforced`. It is not — it is **attestable**. A holder proves it and a contract records it, but
+nothing compels the holder to attest and no operation is blocked for its absence; a consumer
+decides what to require. Enforcing it inside a transfer needs the rule in the circuit
+(`experiments/circuit-cap-poc`). The field now reads `enforced: false, attestable: true`, and
+every claim carries `verified_on_testnet` where we exercised it.
 
 ## 7. Toolchain
 

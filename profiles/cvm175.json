@@ -1,0 +1,100 @@
+{
+  "$schema": "./schema.md",
+  "profile": "cvm175",
+  "version": "0.1.0",
+  "jurisdiction": "BR",
+  "regulation": {
+    "name": "Resolução CVM 175",
+    "instrument": "FIDC — fundo de investimento em direitos creditórios",
+    "reference": "https://conteudo.cvm.gov.br/legislacao/resolucoes/resol175.html",
+    "note": "Engineering intent, not legal advice. The mapping below is the subset a token can enforce; everything else lives in the fund's documents and its administrator."
+  },
+  "identity": {
+    "comment": "The qualitative half: who may hold. Enforced on every token operation via velum-policy, which asks the RWA identity verifier.",
+    "claim_topics": [
+      {
+        "id": 1,
+        "name": "kyc",
+        "required": true,
+        "comment": "Identity established by an approved certifier. Without it the account cannot register, deposit, transfer or withdraw.",
+        "verified_on_testnet": true
+      },
+      {
+        "id": 2,
+        "name": "qualified_investor",
+        "required": false,
+        "comment": "Investidor qualificado under CVM 175. Declared here but NOT yet enforced: only topic 1 is registered in the deployed claim-topics registry. Turning this on is a registry call, not a code change."
+      }
+    ],
+    "trusted_issuers": [
+      {
+        "role": "kyc_certifier",
+        "topics": [
+          1
+        ],
+        "comment": "Address supplied at deploy time. In production this is the fund's KYC provider or its administrator."
+      }
+    ]
+  },
+  "quantitative": {
+    "comment": "The half the policy interface cannot express, because balances are commitments. Enforced by holder-attested proofs instead — see velum-attest.",
+    "minimum_position": {
+      "value": 500000,
+      "unit": "underlying asset base units",
+      "circuit": "disclose_balance_ge",
+      "enforced": false,
+      "comment": "The holder proves position >= this value and a contract records it. Note the distinction: this is ATTESTABLE, not enforced — nothing compels a holder to attest, and no operation is blocked for lack of an attestation. A consumer (transfer agent, distributor, another contract) decides what to require. Enforcing it inside the transfer would need the quantitative rule in the circuit itself — see experiments/circuit-cap-poc. Also note this is the ticket floor, not the CVM net-worth test for investidor qualificado, which is an identity claim (topic 2) attested off-chain.",
+      "attestable": true
+    },
+    "concentration_ceiling": {
+      "value": null,
+      "circuit": "disclose_balance_le",
+      "enforced": false,
+      "comment": "Same construction with the predicate inverted, provable against a public fund total. Circuit not built."
+    },
+    "subordination_ratio": {
+      "enforced": false,
+      "comment": "Senior/subordinated ratio is a statement over encrypted aggregates ACROSS accounts. Open problem — see whitepaper §6."
+    }
+  },
+  "issuer_controls": {
+    "freeze": {
+      "enabled": true,
+      "comment": "Immediate and unilateral, inherited from the confidential token's compliance extension. Verified: freeze(alice) emitted Frozen and her next policy-gated operation failed with #3601 AccountFrozen — distinguishable from #3602 NotAuthorizedByPolicy. unfreeze restored it.",
+      "verified_on_testnet": true
+    },
+    "sac_passthrough": {
+      "enabled": true,
+      "comment": "The classic issuer's own set_authorized/freeze cascades into the confidential wrapper with no state mirrored by the token admin.",
+      "verified_on_testnet": true
+    },
+    "clawback": {
+      "individual": false,
+      "comment": "Not available: once value enters the wrapper the SEP-41 ledger lists the contract as holder. Design and circuit exist (whitepaper §11, circuits/seize); the migration does not. Freeze is the control that works today."
+    }
+  },
+  "classes": [
+    {
+      "name": "senior",
+      "symbol": "PLINARF",
+      "comment": "Preferential return."
+    },
+    {
+      "name": "subordinated",
+      "symbol": "PLINARFB",
+      "comment": "First-loss, held by the issuer."
+    }
+  ],
+  "deployment": {
+    "network": "testnet",
+    "comment": "Testnet only. The UltraHonk verifier upstream is developer preview and unaudited; do not point this profile at mainnet.",
+    "contracts": {
+      "identity_registry": "CDG2WQ3CSIDHUB5CYHONFSSOQJ3GUUDVLWZUXUU7WEUITO2ZHDJSL25H",
+      "claim_topics_and_issuers": "CB7ODYCJLLCWHMCYSZ6IUT3OQEQ5KEGX2OXNM3I2CIMI3IQ3QOTB226N",
+      "identity_verifier": "CBZS626ZJMLC2ILCJCV4RLSLR7MZYBDEV7DNAEY5CZRKUFQQUPVH5M22",
+      "velum_policy": "CCCQ7Z6FYLCIXHBQDSIUJ46YMS63VDHY3ZM5ISGWGFJ5EXONOWOXQXDK",
+      "velum_attest": "CDEDFUYUNNQLU4C7ISKXJ26AIPIR42UJPW7XO72EZFEC3Y6VT6OO7LPK",
+      "gated_token": "CBDT4EKUF66MS7HHDHMLDPDI7TOPZCV7AYYLC53ES7TEB67KAT3BFWV5"
+    }
+  }
+}
