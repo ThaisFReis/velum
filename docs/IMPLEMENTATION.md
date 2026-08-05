@@ -14,7 +14,7 @@ Last run: **2026-08-05**. Network: **Stellar testnet**.
 | Contract | Address | Notes |
 |---|---|---|
 | `velum-attest` | `CDEDFUYUNNQLU4C7ISKXJ26AIPIR42UJPW7XO72EZFEC3Y6VT6OO7LPK` | 36 937 B wasm. Constructor: owner, token, `addr_f`, VK, threshold=500 000 |
-| `velum-policy` | *built, not yet deployed* | 7 808 B wasm |
+| `velum-policy` | `CCCQ7Z6FYLCIXHBQDSIUJ46YMS63VDHY3ZM5ISGWGFJ5EXONOWOXQXDK` | 7 808 B wasm. Delegates to the identity verifier below |
 
 ### Confidential-token stack (upstream code, deployed by us)
 
@@ -37,10 +37,13 @@ Last run: **2026-08-05**. Network: **Stellar testnet**.
 | claim-issuer | `CBLUFPON4LW4OXPOZP6LYHFPFQJXDW6M5O52ES2TALKWBN4REUX665IA` |
 | identity (holder) | `CDLHCYRNG5BKYJMLUGVTIVJBST2BTDYEDMGT3VCYJCK3Q63DZDB3SST7` |
 | identity-registry | `CDG2WQ3CSIDHUB5CYHONFSSOQJ3GUUDVLWZUXUU7WEUITO2ZHDJSL25H` |
+| identity-verifier | `CBZS626ZJMLC2ILCJCV4RLSLR7MZYBDEV7DNAEY5CZRKUFQQUPVH5M22` |
 
 Claim topic 1 (KYC) registered; the claim issuer is trusted for it; an Ed25519 signing key is
-authorised; the holder's identity contract carries a signed KYC claim. **Pending:** identity
-registration (`add_identity`) and the identity-verifier deploy — see §6.
+authorised; the holder's identity contract carries a signed KYC claim; and the holder is
+registered in the identity registry with a Brazilian residence profile
+(tx `da8c0a6c…376e`, events `IdentityStored` + `country_data_added`). That last call needed the
+XDR-JSON payload in §6.4 — the format documented upstream cannot work.
 
 ---
 
@@ -95,6 +98,32 @@ The prover supplies only the proof. A caller substituting its own commitment wou
 against a blob the contract never assembles.
 
 ---
+
+## 2.1 Identity gating: the same question, two answers
+
+`velum-policy` is deployed against the identity verifier and answers the token's authorization
+question for two wallets. Alice carries a KYC claim issued by an approved certifier; Bob carries
+nothing.
+
+```
+=== is_authorized(ALICE — KYC claim registered):
+true
+
+=== is_authorized(BOB — no identity):
+CBZS626Z… - Failure - Log: {"vec":[{"string":"VM call trapped with HostError"},
+                                   {"symbol":"verify_identity"},{"error":{"contract":321}}]}
+false
+```
+
+Error 321 is `IdentityNotFound`, raised by the RWA verifier. The log line is the evidence that
+the adapter does its job: the RWA side signals failure by **panicking**, the token's `Policy`
+expects a **boolean**, and a panic crossing a cross-contract call would abort the whole
+transaction instead of letting the token reject the operation cleanly. `velum-policy` calls
+through the generated client's `try_` variant and folds the trap into `false`.
+
+The distinction that matters for a regulated fund: Bob is not refused because he is absent from
+a list. He is refused because he carries no valid claim from an approved issuer — and the same
+registry answers for the public asset and the confidential wrapper.
 
 ## 3. Circuits
 
@@ -219,9 +248,9 @@ Run without `VELUM_ATTEST` to print the verification key needed to deploy `velum
 
 ## 8. What is not done
 
-- `velum-policy` is built but not deployed; the identity gate is not yet wired to a token.
-- `add_identity` has not been called with the payload in §6.4 — the identity-verifier deploy
-  depends on it.
+- A confidential token bound to `velum-policy` (via the factory's `deploy_compliant_token`) is
+  not yet deployed, so the gate is proven at the policy interface but not yet exercised through
+  a token operation.
 - The clawback migration (register-circuit escrow, new VK, re-registration) is designed and
   priced in the whitepaper §11.6, not built.
 - Aggregates across accounts — concentration by tranche, subordination ratio — remain open.
