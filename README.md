@@ -49,7 +49,8 @@ regulado (FIDC, CRI/CRA, precatórios, LATAM em geral).
 
 | Doc | O quê |
 |---|---|
-| **`docs/WHITEPAPER.md`** | **Whitepaper técnico (EN)** — a tese "holder-attested compliance", arquitetura, avaliação medida, limitações e trabalho relacionado |
+| **`docs/Velum-OnePage.pdf`** | **One page (EN)** — a tese, o que foi construído, os números medidos e a citação upstream, em uma folha |
+| **`docs/WHITEPAPER.md`** | **Whitepaper técnico (EN)** — a tese "holder-attested compliance", arquitetura, avaliação medida, limitações, trabalho relacionado e o Apêndice A com evidência primária citada linha a linha |
 | `docs/SPIKE-CT-2026-08-04.md` | De-risk do pipeline + o achado que corrigiu a premissa do brief |
 | `circuits/README.md` | O circuito `disclose_balance_ge`: restrições, resultados, como reproduzir |
 | `docs/VALIDACAO-2026-08-04.md` | Primeira validação dos primitivos — **ler junto do SPIKE**, que corrige parte dela |
