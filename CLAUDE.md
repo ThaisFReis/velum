@@ -23,6 +23,20 @@ Contexto interno do time (estratégia, briefs, material Plina) fica em `internal
 | `refs/oz-stellar-contracts-main` | Módulo RWA/T-REX (`packages/tokens/src/rwa/`, `examples/rwa/`) |
 | `refs/ct-demo` | Demo oficial (SDK TS, app Next.js, indexer) — base do pipeline de provas |
 
+## Regra permanente: manter o registro de implementação
+
+**Todo passo de implementação, correção de bug ou mudança relevante entra em
+`docs/IMPLEMENTATION.md` no mesmo commit da mudança** — não depois, não no fim do dia.
+
+O que registrar:
+- endereço de contrato deployado, hash de transação, saída de console real (colada, não parafraseada);
+- custo medido (tamanho de prova, opcodes, tempo) — sempre medido, nunca estimado;
+- **bugs e becos sem saída**, com a causa-raiz e como foi diagnosticada. Esta seção vale tanto
+  quanto a dos sucessos: é o que ninguém documenta e o que economiza horas de quem vier depois;
+- o que deixou de funcionar ou ainda não foi feito, na seção final.
+
+Se a mudança não produz evidência nova (refactor puro, ajuste de texto), não precisa entrar.
+
 ## Restrições validadas (não violar)
 
 - **Clawback confidencial não existe upstream** (COMPLIANCE.md §5 é spec com lacuna aberta).
