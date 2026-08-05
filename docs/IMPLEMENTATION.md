@@ -15,6 +15,7 @@ Last run: **2026-08-05**. Network: **Stellar testnet**.
 |---|---|---|
 | `velum-attest` | `CDEDFUYUNNQLU4C7ISKXJ26AIPIR42UJPW7XO72EZFEC3Y6VT6OO7LPK` | 36 937 B wasm. Constructor: owner, token, `addr_f`, VK, threshold=500 000 |
 | `velum-policy` | `CCCQ7Z6FYLCIXHBQDSIUJ46YMS63VDHY3ZM5ISGWGFJ5EXONOWOXQXDK` | 7 808 B wasm. Delegates to the identity verifier below |
+| identity-gated token | `CBDT4EKUF66MS7HHDHMLDPDI7TOPZCV7AYYLC53ES7TEB67KAT3BFWV5` | Confidential token deployed through upstream's factory, bound to `velum-policy`, `sac_passthrough: true` |
 
 ### Confidential-token stack (upstream code, deployed by us)
 
@@ -124,6 +125,29 @@ through the generated client's `try_` variant and folds the trap into `false`.
 The distinction that matters for a regulated fund: Bob is not refused because he is absent from
 a list. He is refused because he carries no valid claim from an approved issuer — and the same
 registry answers for the public asset and the confidential wrapper.
+
+### Through the token, not just the interface
+
+`scripts/demo-gate.ts` has both wallets attempt the same operation — `register` — on the
+identity-gated token above:
+
+```
+token (policy-gated) = CBDT4EKUF66MS7HHDHMLDPDI7TOPZCV7AYYLC53ES7TEB67KAT3BFWV5
+
+[velum-alice] KYC claim from an approved issuer
+  ✅ accepted — tx d9a1a33cdadebd9f440c958a5557e29c7e030ad411e84335cb0307da1ab78fd7
+
+[velum-bob] no identity registered
+  ⛔ refused by policy — Error(Contract, #3602)
+```
+
+`3602` is `NotAuthorizedByPolicy`. Note what it is not: Bob produced a **valid zero-knowledge
+proof** for the register circuit, and it never mattered. Identity is checked before the proof is
+considered, so cryptographic correctness cannot buy entry to a regulated asset.
+
+The token was created through upstream's own factory (`deploy_compliant_token`) with our policy
+address; the deployment event records `policy = CCCQ7Z6F…OXQXDK, sac_passthrough: true`. Nothing
+upstream was modified to make this work.
 
 ## 3. Circuits
 
@@ -248,9 +272,6 @@ Run without `VELUM_ATTEST` to print the verification key needed to deploy `velum
 
 ## 8. What is not done
 
-- A confidential token bound to `velum-policy` (via the factory's `deploy_compliant_token`) is
-  not yet deployed, so the gate is proven at the policy interface but not yet exercised through
-  a token operation.
 - The clawback migration (register-circuit escrow, new VK, re-registration) is designed and
   priced in the whitepaper §11.6, not built.
 - Aggregates across accounts — concentration by tranche, subordination ratio — remain open.
