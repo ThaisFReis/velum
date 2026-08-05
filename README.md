@@ -25,7 +25,7 @@ Hoje toda disclosure é verificada off-chain, no navegador.
 |---|---|
 | `contracts/velum-policy` — ponte identidade ↔ Confidential Token | ✅ compila (7.808 B) |
 | `circuits/disclose_balance_ge` — spec §9, o circuito que faltava | ✅ **10/10 testes; prova gerada em 0,25s e verificada** |
-| `contracts/velum-attest` — verificação on-chain da prova | ✅ compila (36.937 B) |
+| `contracts/velum-attest` — verificação on-chain da prova | ✅ **deployado em testnet e verificando provas reais** |
 | `experiments/circuit-cap-poc` — teto por operação no circuito de transfer | ✅ 34/34 testes, +3% de custo |
 | `experiments/clawback-poc` — premissa do clawback individual (whitepaper §11) | ✅ 5/5 testes — premissa verificada; seize parcial demonstrado |
 | `circuits/seize` — clawback individual: o circuito de enforcement | ✅ **11/11 testes; 93 opcodes; prova 0,33s verificada** |
@@ -49,6 +49,7 @@ regulado (FIDC, CRI/CRA, precatórios, LATAM em geral).
 
 | Doc | O quê |
 |---|---|
+| **`docs/IMPLEMENTATION.md`** | **Registro de implementação** — endereços em testnet, hash da atestação, saídas de console, custos medidos e as duas falhas que custaram tempo |
 | **`docs/Velum-Deck.pdf`** | **Pitch deck (EN)** — 10 slides 16:9 para a apresentação no summit |
 | **`docs/Velum-OnePage.pdf`** | **One page (EN)** — a tese, o que foi construído, os números medidos e a citação upstream, em uma folha |
 | **`docs/WHITEPAPER.md`** | **Whitepaper técnico (EN)** — a tese "holder-attested compliance", arquitetura, avaliação medida, limitações, trabalho relacionado e o Apêndice A com evidência primária citada linha a linha |
