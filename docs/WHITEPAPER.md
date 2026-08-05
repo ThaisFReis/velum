@@ -79,6 +79,10 @@ limit, subordination ratio between tranches. Every one of these is a statement a
 and this is where the interface runs out: `is_authorized` receives an address. It sees no
 amount and no balance, because there is no amount and no balance to see — only commitments.
 
+Both halves of this section are sourced to upstream's code and specifications in **Appendix A**
+— including the trait signatures, the sentence stating that the token's only agreement with a
+policy is a boolean, and the open issue that names the missing bridge.
+
 ---
 
 ## 3. Why the enforcement point must move
@@ -93,6 +97,10 @@ The confidential token's lifecycle hooks reveal the boundary precisely:
 | `on_deposit(from, to, amount: i128)` | yes — deposits are public |
 | `on_withdraw(from, to, amount: i128, …)` | yes — withdrawals are public |
 | `on_transfer(from, to, payload)` | **no** — the amount is a commitment |
+
+Those two signatures are reproduced verbatim in Appendix A.1, alongside the RWA compliance
+hooks that expect cleartext amounts and balances — the two worlds cannot meet, and the reason is
+a type signature.
 
 So amount rules *can* be enforced where value crosses the wrapper's boundary. But in the
 realistic fund topology the investor never deposits: the distributor holds the public balance
@@ -377,6 +385,11 @@ defers its own crux, the treatment of the spendable-balance blinding `r_s`:
 > "The follow-up revision will pin down whether `r_s` is supplied as a private witness with an
 > auxiliary opening proof or derived in-circuit from a separately escrowed value."
 
+The passage is quoted at greater length in Appendix A.4, where upstream also states the
+obstacle outright — *"because the clawback circuit does not have access to `vk_A`"* — and lists
+"derived in-circuit from a separately escrowed value" as one of the two candidate remedies. This
+note takes that option and names the value.
+
 The difficulty is real. The auditor recovers the *value* `v_s` from the sender-channel checkpoint,
 and the full opening `(v_r, r_r)` of the receiving side by replaying per-transfer ciphertexts. It
 cannot recover `r_s`, which derives from the holder's viewing key.
@@ -516,6 +529,170 @@ Velum implements that for the two rules a regulated fund needs first, on top of 
 upstream token, using a circuit its own specification already describes. The remaining hard
 problem — predicates over encrypted aggregates across accounts — is, as far as we can determine,
 unsolved on any chain.
+
+---
+
+## Appendix A — The gap in upstream's own words
+
+Every load-bearing claim in §§2, 3 and 11 is a statement about someone else's codebase, so this
+appendix sources each one to a line of that codebase. Nothing here is our characterisation: the
+quotes are verbatim and the signatures are copied as they appear.
+
+**How to verify.** Two revisions are involved, and the distinction matters. The Confidential
+Token *implementation* lives only on `feat/confidential-verifier-ultrahonk`, which we pin at
+`539968f`; the *specifications* were merged to `main`, which we read at `9b5ed96` (2026-07-31).
+Paths below are relative to `packages/tokens/src/` in `OpenZeppelin/stellar-contracts`.
+
+### A.1 The authorization interface cannot see value
+
+`confidential/compliance/mod.rs:41`
+
+```rust
+pub trait Policy {
+    /// Returns `true` iff `account` is authorized to interact with
+    /// `token`.
+    fn is_authorized(e: Env, account: Address, token: Address) -> bool;
+}
+```
+
+An address, a token, a boolean. The specification states the consequence plainly
+(`confidential/docs/COMPLIANCE.md:81`):
+
+> "Membership management, list semantics, and identity proofs live entirely inside the policy
+> contract. **The token's only agreement with the policy is the boolean return value.**"
+
+The lifecycle hooks draw the same boundary from the other side. `confidential/mod.rs:175` and
+`:185`:
+
+```rust
+fn on_deposit(e: &Env, from: &Address, to: &Address, amount: i128) {}
+fn on_transfer(e: &Env, from: &Address, to: &Address, payload: &TransferPayload) {}
+```
+
+A deposit carries a cleartext `i128`. A confidential transfer carries a payload of commitments
+and a proof — there is no amount to pass, and none is passed. This is §3's argument, in two
+signatures.
+
+### A.2 The two compliance worlds have incompatible signatures
+
+The RWA module's compliance hooks, in the same library, expect exactly what the confidential
+side cannot provide. `rwa/compliance/modules/mod.rs:166`:
+
+```rust
+fn on_transfer(
+    e: &Env,
+    from: AccountSnapshot,
+    to: AccountSnapshot,
+    amount: i128,
+    kind: TransferKind,
+    token: Address,
+);
+```
+
+and `rwa/compliance/mod.rs:92`:
+
+```rust
+pub struct AccountSnapshot {
+    pub address: Address,
+    /// The wallet's total token balance, before the operation.
+    pub balance: i128,
+    /// The partially-frozen portion of `balance`, before the operation.
+    pub frozen: i128,
+}
+```
+
+Cleartext amount, cleartext balance, cleartext frozen portion. Every shipped quantitative module
+— `compliance-max-balance`, `compliance-supply-limit`, `compliance-initial-lockup-period`,
+`compliance-time-transfers-limits` — is written against this. None of them can be wired to a
+confidential token, and the reason is a type signature, not an oversight.
+
+### A.3 Upstream says the identity bridge is missing
+
+Issue **#766, "RWA: Confidential support"** — opened 2026-07-06, still **open** at the time of
+writing, milestone *Release Candidate v0.9.0*:
+
+> "Adds confidential-balance support to the RWA token, integrating the confidential token
+> module's private balances and transfers with RWA's compliance and identity-verification
+> extensions, so regulated tokens can hide transfer amounts while retaining on-chain compliance
+> enforcement."
+
+That is the shape of `velum-policy`, written by the maintainers as future work. We also checked
+the released artifacts: the newest tag at the time of writing (`v0.8.0-rc.3`) contains no
+cross-reference between the `confidential` and `rwa` modules in either direction.
+
+### A.4 The clawback problem, stated and deferred by upstream
+
+`confidential/docs/COMPLIANCE.md:185` — why an issuer's ordinary clawback cannot reach one
+holder:
+
+> "Once an account deposits into the contract, the underlying SEP-41 ledger lists the token
+> contract as the holder of those funds, not the depositor. An issuer's SAC-level
+> `clawback(token_address, amount)` call would drain the pool, debiting unrelated accounts."
+
+And `COMPLIANCE.md:218` — the sentence that defines §11 of this paper. It names both the
+obstacle and, in its last clause, the shape of the remedy *(mathematical notation simplified from
+the LaTeX source; wording otherwise verbatim)*:
+
+> "…where `r_s` is recovered via the same path the wallet uses for checkpoint recovery
+> (`DESIGN.md` §5.2): `r_s = Poseidon(δ_spend_r, vk_A, σ_old)`. **Because the clawback circuit
+> does not have access to `vk_A`**, the spendable-balance side of the proof binds via the
+> consistency of `b̃_aud,s_old` with `C_spend` at the time of the last owner-initiated proof.
+> **The follow-up revision will pin down whether `r_s` is supplied as a private witness with an
+> auxiliary opening proof or derived in-circuit from a separately escrowed value.**"
+
+Three things are established by that passage alone. The blinding is a deterministic function of
+`vk_A` — their equation, not ours. The obstacle is that the circuit lacks `vk_A`. And one of the
+two candidate remedies they list is *a separately escrowed value*. §11 takes that second option
+and says what the escrowed value should be: `vk_A` itself.
+
+### A.5 The predicate circuit is specified, and unimplemented
+
+`confidential/docs/SELECTIVE_DISCLOSURE.md:374` specifies the circuit implemented in
+`circuits/disclose_balance_ge`:
+
+> "Two `circuit_id` shapes are exposed: a **predicate-only** form (`disclose_balance_ge` /
+> `disclose_balance_le`) that includes DB4 and omits U1–U3, where the proof's mere validity
+> asserts the predicate; and a **value-revealing** form (`disclose_balance_value`)…"
+
+The §15.1 circuit inventory lists four disclosure circuits: `disclose_recipient`,
+`disclose_sender`, `disclose_auditor`, `disclose_balance`. The reference implementation
+distributes two. The provenance check for the other two is recorded at the end of this paper.
+
+### A.6 On-chain verification is named, then excluded
+
+`SELECTIVE_DISCLOSURE.md:542`:
+
+> "These circuits do *not* register with the on-chain verifier set (DESIGN_cont.md §10). **They
+> are verified entirely off-chain.**"
+
+The exclusion is deliberate, and §14 records what the excluded thing would look like — including
+that the predicate shape is the one it would take:
+
+> "…can be added by trivially dropping U1–U3 and exposing `v_transfer` as a public input.
+> **This is also the proof shape an on-chain verifier would consume (§5.4).**"
+
+The enum that would have to carry such a circuit confirms the exclusion in code
+(`confidential/verifier/mod.rs:100`):
+
+```rust
+Register = 0,
+Withdraw = 1,
+Transfer = 2,
+SpenderTransfer = 3,
+SetSpender = 4,
+RevokeSpender = 5,
+```
+
+Six transaction circuits, no disclosure variant. `velum-attest` therefore runs its own
+single-entry registry rather than extending a closed enum.
+
+### A.7 What this appendix is not
+
+It is not a claim that the maintainers were unaware, careless, or slow. The opposite: each gap
+above is documented by them, in their own repository, in the same commits that ship the working
+parts. A specification that names its own open questions is a good specification. Velum's
+contribution is to answer three of those questions with running code — and, where an answer is
+still a proposal (§11's migration), to say so.
 
 ---
 
