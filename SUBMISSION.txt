@@ -1,0 +1,107 @@
+VELUM — Holder-attested compliance for Confidential Tokens on Stellar
+Sub-lane: Enterprise, Compliance and RWA (OpenZeppelin + Nethermind)
+Repository: https://github.com/ThaisFReis/velum  ·  MIT  ·  live on testnet
+
+
+WHAT IT IS
+
+A compliance kit that lets a regulated fund keep its register of holders private
+and still prove it obeys the rules — without revealing any amount to anyone,
+including the verifier.
+
+
+THE PROBLEM
+
+Compliance asks two questions of a fund's register, and OpenZeppelin's
+stellar-contracts ships the primitives for both, wired to neither.
+
+Who may hold? Upstream's confidential token gates on a flat address allowlist —
+no reason, no expiry, no attesting party. Bridging it to the RWA identity
+registry is their own issue #766, open since July.
+
+How much may they hold? This one is structurally impossible at that interface.
+`is_authorized(account, token) -> bool` receives an address and never a value,
+because balances are Pedersen commitments. The RWA modules that enforce caps
+demand a cleartext amount. The two cannot meet.
+
+Under FHE a contract compares ciphertexts with no witness, so the check fits
+inside the transfer. Under commitments a proof needs a witness, and for any
+balance exactly one party holds it. So the check has to move: quantitative
+compliance cannot be transaction-gated, it must be holder-attested.
+
+
+WHAT WE BUILT
+
+- velum-policy — an adapter from the token's authorization gate to an
+  ERC-3643/T-REX identity registry: does this holder carry a valid claim from an
+  approved issuer? It also fails closed on a registry misconfiguration that
+  upstream ignores silently.
+- disclose_balance_ge + velum-attest — the predicate circuit upstream specifies
+  and does not ship, plus a Soroban contract that verifies it on-chain. The
+  holder proves "my position >= T"; nothing is decrypted, because there is
+  nothing to decrypt.
+- circuits/seize + velum-seize — an answer to upstream's open question on
+  individual clawback. A partial seizure, proven bounded by a position the
+  ledger never reveals, and verified on-chain.
+- profiles/cvm175.json — a jurisdiction as configuration, annotated with what is
+  actually enforced and what is merely declared.
+
+Everything runs on an unmodified upstream token. Nothing in stellar-contracts or
+in the reference demo was patched to make it work. Study clones live in a
+git-ignored folder, so no one else's code is in this repository.
+
+
+LIVE ON TESTNET
+
+  velum-attest  CBCBSILY5B562Q263W4EDYU7IHBV3SSM3IFWA333MII3OK3QRGNCDXKY
+  velum-seize   CDVV37Y766VSLNRRIHRXBTUCEN7UJU7QQVROLWYVA6L7FRTKJO3Z2LE5
+  velum-policy  CDJET5BV36RDRNCNCNXJFYWUKPCX4VWXTUY4EGU4W5VUJ3FHLHIYFPKV
+  gated token   CBDT4EKUF66MS7HHDHMLDPDI7TOPZCV7AYYLC53ES7TEB67KAT3BFWV5
+
+Two transactions worth opening:
+
+  A position proved on-chain
+  f6c02ceb6dde8abe6b1a1b0ccd4c8bc265098c5c7564d78520870031241213da
+
+  A seizure proved on-chain, bounded by a position nobody can read
+  282a2947b2998b2b2de56c9727d0a151d8aa0a9f8e55d10014e915309be8c4cd
+
+Three demo scripts and an adversarial suite run against these contracts. The
+suite probes what the system should refuse — one holder's proof submitted for
+another account, a proof replayed after the balance moved, a stranger
+submitting a valid seizure, an amount changed after proving. Nine probes, all
+refused as designed.
+
+
+WHAT WE FOUND IN UPSTREAM
+
+Seven defects, each with reproduction. Six are documentation, tooling or
+behaviour. The seventh is a soundness gap in the specification itself: its
+disclosure flow resolves only the spendable commitment, which is harmless for a
+minimum-holding rule and evadable for the concentration ceiling the same
+sentence names — park value on the receiving side and you are under any cap. We
+bind both commitments.
+
+
+WHAT WE ARE NOT CLAIMING
+
+Not production: developer-preview cryptography, the verifier is unaudited,
+testnet only. Not finished: the seizure verifies but no value moves, and the key
+escrow behind it is designed and priced, not built. Not solved: predicates over
+encrypted aggregates across accounts remain open. Not invented: we implement
+their specification, and the novelty claim is bounded to what we can verify —
+no public implementation exists in any repository, branch, tag or history.
+
+
+DOCUMENTS
+
+  README.md                  problem, what is ours vs upstream, how to run it
+  docs/WHITEPAPER.md         the thesis, with every claim about upstream sourced
+                             to a file and line
+  docs/IMPLEMENTATION.md     addresses, hashes, console output, measured costs —
+                             and the failures that cost us time
+  docs/Velum-OnePage.pdf     one page
+  docs/Velum-Deck.pdf        ten slides
+
+Anchor case: a Brazilian receivables fund (FIDC) under CVM 175 — Plina Finance.
+The kit serves any regulated issuer facing the same paradox.

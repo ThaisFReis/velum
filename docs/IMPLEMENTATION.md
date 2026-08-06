@@ -535,6 +535,11 @@ Rebuilt from source and re-checked by extracting the text back out of the finish
 occurrence of `66 test` or `five upstream` survives, layout intact (deck 10 pages, one-page 1).
 The whitepaper PDF is regenerated the same way whenever `docs/WHITEPAPER.md` changes.
 
+The README had the same drift in miniature: its headline transaction still pointed at a proof
+verified by `velum-attest` **v1**, a contract no longer in the address table. A judge following the
+link would land somewhere the submission does not list. Repointed to `f6c02ceb…1213da`, the run
+against the deployed contract.
+
 ## 7. Toolchain
 
 `nargo 1.0.0-beta.11` · `bb 0.87.0` (CLI, for local circuit work only) · `@aztec/bb.js 0.87.0`

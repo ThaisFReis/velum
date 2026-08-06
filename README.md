@@ -61,8 +61,8 @@ RWA/T-REX module, the UltraHonk verifier, and the reference demo's SDK. Study cl
 
 Two transactions worth opening:
 
-- **A position proved on-chain** — [`f8ff2951…c13267`](https://stellar.expert/explorer/testnet/tx/f8ff2951ad2277d4337b590842762a60ee46b8936d9c9014f5154a0918c13267).
-  A contract read the holder's commitment and viewing key from the token, the threshold from its own
+- **A position proved on-chain** — [`f6c02ceb…1213da`](https://stellar.expert/explorer/testnet/tx/f6c02ceb6dde8abe6b1a1b0ccd4c8bc265098c5c7564d78520870031241213da).
+  A contract read the holder's commitments and viewing key from the token, the threshold from its own
   profile, verified an UltraHonk proof, and recorded that the position clears 500 000 — without the
   amount appearing anywhere.
 - **A seizure proved on-chain** — [`282a2947…8c4cd`](https://stellar.expert/explorer/testnet/tx/282a2947b2998b2b2de56c9727d0a151d8aa0a9f8e55d10014e915309be8c4cd).
