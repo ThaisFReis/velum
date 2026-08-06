@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Velum — Pitch Deck</title>
+<style>
+  :root{
+    --petrol:#132728; --abyss:#080f10; --grey:#e4e4e4; --white:#fff;
+    --cyan-ink:#046C88; --cyan:#0EA7C7; --mist:#A0CFE7;
+    --ink:#132728; --muted:rgba(19,39,40,.64); --hair:rgba(19,39,40,.13);
+  }
+  *{box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+  @page{size:338.7mm 190.5mm; margin:0;}
+  html,body{margin:0;padding:0;}
+  body{font-family:Helvetica,Arial,"DejaVu Sans",sans-serif; color:var(--ink);}
+  code,.mono{font-family:"DejaVu Sans Mono",Menlo,monospace;}
+
+  .slide{width:338.7mm; height:190.5mm; padding:20mm 22mm; position:relative;
+         break-after:page; overflow:hidden; display:flex; flex-direction:column;}
+  .slide:last-child{break-after:auto;}
+  .slide.dark{background:var(--petrol); color:var(--grey);}
+  .slide.abyss{background:var(--abyss); color:var(--grey);}
+
+  .kicker{font-family:"DejaVu Sans Mono",monospace; font-size:9pt; letter-spacing:.3em;
+          text-transform:uppercase; color:var(--cyan-ink); margin:0 0 10mm;}
+  .dark .kicker,.abyss .kicker{color:var(--cyan);}
+
+  h1{font-size:54pt; line-height:1.02; margin:0 0 6mm; letter-spacing:-.02em;}
+  h2{font-size:34pt; line-height:1.1; margin:0 0 7mm; letter-spacing:-.018em;}
+  h3{font-size:19pt; line-height:1.2; margin:0 0 3mm; letter-spacing:-.01em;}
+  .dark h1,.dark h2,.dark h3,.abyss h1,.abyss h2{color:#fff;}
+  p{font-size:14pt; line-height:1.45; margin:0 0 4mm; max-width:250mm;}
+  .lead{font-size:19pt; line-height:1.36;}
+  .muted{color:var(--muted);} .dark .muted,.abyss .muted{color:var(--mist);}
+  .accent{color:var(--cyan-ink);} .dark .accent,.abyss .accent{color:var(--cyan);}
+  b,strong{font-weight:bold;}
+  .grow{flex:1;}
+  .pagenum{position:absolute; right:14mm; bottom:10mm; font-family:"DejaVu Sans Mono",monospace;
+           font-size:8pt; color:var(--muted); letter-spacing:.16em;}
+  .brandmark{position:absolute; left:22mm; bottom:10mm; font-family:"DejaVu Sans Mono",monospace;
+             font-size:8pt; letter-spacing:.22em; text-transform:uppercase; color:var(--muted);}
+  /* on dark slides the muted ink would sit dark-on-dark and disappear */
+  .dark .pagenum,.abyss .pagenum,.dark .brandmark,.abyss .brandmark{color:rgba(160,207,231,.62);}
+
+  code{font-size:.86em; background:rgba(19,39,40,.08); padding:1px 5px; border-radius:3px;}
+  .dark code,.abyss code{background:rgba(255,255,255,.11); color:#cfe8f2;}
+
+  .cols{display:flex; gap:14mm;} .cols > *{flex:1;}
+  .cols3{display:flex; gap:10mm;} .cols3 > *{flex:1;}
+
+  table{width:100%; border-collapse:collapse; font-size:12.5pt;}
+  th{font-family:"DejaVu Sans Mono",monospace; font-size:8pt; letter-spacing:.16em;
+     text-transform:uppercase; color:var(--muted); text-align:left;
+     border-bottom:1.5px solid var(--petrol); padding:0 8mm 3mm 0; vertical-align:bottom;}
+  .dark th{color:var(--mist); border-bottom-color:var(--mist);}
+  td{border-bottom:1px solid var(--hair); padding:5mm 8mm 5mm 0; vertical-align:top; line-height:1.38;}
+  .dark td{border-bottom-color:rgba(255,255,255,.13);}
+
+  .quote{border-left:4px solid var(--cyan); padding:6mm 0 6mm 10mm; margin:2mm 0 6mm;}
+  .quote p{font-size:18pt; line-height:1.42; margin:0;}
+
+  .stat{display:flex; align-items:baseline; gap:5mm; border-bottom:1px solid rgba(255,255,255,.13);
+        padding:4.2mm 0;}
+  .stat .v{font-family:"DejaVu Sans Mono",monospace; font-size:23pt; color:var(--cyan);
+           min-width:56mm; font-weight:bold;}
+  .stat .l{font-size:13pt;}
+  .stat:last-child{border-bottom:0;}
+
+  .chip{display:inline-block; font-family:"DejaVu Sans Mono",monospace; font-size:9.5pt;
+        border:1px solid var(--cyan-ink); color:var(--cyan-ink); border-radius:3px;
+        padding:2mm 4mm; margin:0 3mm 3mm 0;}
+  .dark .chip,.abyss .chip{border-color:var(--cyan); color:var(--cyan);}
+  .tick{color:var(--cyan-ink); font-weight:bold;} .dark .tick{color:var(--cyan);}
+</style>
+</head>
+<body>
+
+<!-- 1 · TITLE -->
+<section class="slide abyss">
+  <p class="kicker">Stellar Summit SP 2026 · Enterprise, Compliance &amp; RWA</p>
+  <div class="grow" style="display:flex;flex-direction:column;justify-content:center">
+    <h1>Velum.</h1>
+    <p class="lead" style="color:#fff;max-width:210mm">Holder-attested compliance for
+    Confidential Tokens on Stellar.</p>
+    <p class="lead muted" style="max-width:210mm">A regulated fund can hide its register of holders
+    — and still prove it obeys the rules. Without revealing the amount to anyone.
+    <b class="accent">Including the verifier.</b></p>
+  </div>
+  <span class="brandmark">github.com/ThaisFReis/velum</span>
+</section>
+
+<!-- 2 · THE PARADOX -->
+<section class="slide">
+  <p class="kicker">The problem</p>
+  <h2>Tokenizing a fund makes it <span class="accent">less</span> private<br>than the paperwork it replaces.</h2>
+  <div class="cols" style="margin-top:4mm">
+    <div>
+      <h3>In the filing cabinet</h3>
+      <p class="muted">The register of holders sits with the administrator. Who subscribed, how
+      much, when they left — none of it is public.</p>
+    </div>
+    <div>
+      <h3>On a public ledger</h3>
+      <p class="muted">All of it is. Ten institutional positions de-anonymize by correlating
+      subscription timing with off-chain events — and the information has a paying audience.</p>
+    </div>
+  </div>
+  <div class="grow"></div>
+  <p class="lead"><b>Confidential Tokens fix the balances.</b> They do not fix compliance.</p>
+  <span class="pagenum">02</span>
+</section>
+
+<!-- 3 · TWO HALVES -->
+<section class="slide">
+  <p class="kicker">Where it breaks</p>
+  <h2>Compliance has two halves. Upstream ships<br>the primitives for both, wired to neither.</h2>
+  <table>
+    <tr><th style="width:19%">The question</th><th style="width:42%">Upstream today</th><th>What a regulated fund needs</th></tr>
+    <tr>
+      <td><b>Who may hold?</b></td>
+      <td>A flat <b>address allowlist</b>. No reason, no expiry, no attesting party.</td>
+      <td>A <b>valid claim</b> — qualified investor — issued by an approved certifier.
+      <span class="muted">Their issue #766. Still open.</span></td>
+    </tr>
+    <tr>
+      <td><b>How much may they hold?</b></td>
+      <td><b class="accent">Structurally impossible.</b> <code>is_authorized(account, token) -&gt; bool</code>
+      sees no value. Balances are commitments.</td>
+      <td>Minimum ticket. Concentration ceiling. Per-investor cap.
+      <span class="muted">Every rule that mentions a number.</span></td>
+    </tr>
+  </table>
+  <span class="pagenum">03</span>
+</section>
+
+<!-- 4 · THESIS -->
+<section class="slide dark">
+  <p class="kicker">The insight</p>
+  <h2>So the check has to move.</h2>
+  <p class="lead" style="max-width:230mm">Under <b>FHE</b>, a contract compares ciphertexts with no
+  witness — the check fits inside the transfer. Under <b>Pedersen commitments</b>, a proof needs a
+  witness. And for any balance, exactly one party holds it.</p>
+  <p class="lead muted" style="max-width:230mm">A sender cannot prove anything about the
+  recipient's balance. It has no opening for it — and binding guarantees it cannot find another.</p>
+  <div class="grow"></div>
+  <div class="quote">
+    <p>Quantitative compliance cannot be <b>transaction-gated</b>.<br>
+    It must be <b class="accent">holder-attested</b> — the party that can prove<br>
+    is the party whose balance it is.</p>
+  </div>
+  <span class="pagenum">04</span>
+</section>
+
+<!-- 5 · WHAT WE BUILT -->
+<section class="slide">
+  <p class="kicker">What we built · on an unmodified upstream token</p>
+  <h2>Four pieces.</h2>
+  <table>
+    <tr><th style="width:26%">Component</th><th>What it does</th></tr>
+    <tr><td><code>velum-policy</code></td>
+        <td>The token's gate asks an <b>ERC-3643/T-REX identity registry</b> instead of a list.
+        One KYC registry governs the public asset and the confidential wrapper.</td></tr>
+    <tr><td><code>disclose_balance_ge</code></td>
+        <td>The predicate circuit upstream <b>specifies and does not ship</b>. The holder proves
+        <i>"my position ≥ T"</i>. The proof's validity <i>is</i> the assertion — there is nothing
+        to decrypt.</td></tr>
+    <tr><td><code>velum-attest</code></td>
+        <td><b>On-chain verification</b> — which the same spec marks out of scope. Every public
+        input is read from the token and the profile; the prover supplies only the proof.</td></tr>
+    <tr><td><code>circuits/seize</code></td>
+        <td>Answers their open question on <b>individual clawback</b>: premise verified, circuit
+        built, and a partial seizure <b>verified on-chain</b>.</td></tr>
+  </table>
+  <span class="pagenum">05</span>
+</section>
+
+<!-- 6 · DEMO -->
+<section class="slide abyss">
+  <p class="kicker">The demo</p>
+  <h2>Three things you can watch happen.</h2>
+  <div class="cols3" style="margin-top:6mm">
+    <div>
+      <h3><span class="tick">01</span> The explorer goes blind</h3>
+      <p class="muted">Addresses visible, amounts encrypted. The register stops being public.</p>
+    </div>
+    <div>
+      <h3><span class="tick">02</span> A wallet without a claim is refused</h3>
+      <p class="muted">Not because it is on a list — because it carries no qualified-investor
+      attestation.</p>
+    </div>
+    <div>
+      <h3><span class="tick">03</span> A holder proves the threshold</h3>
+      <p class="muted">A contract verifies it on-chain. Nobody learns the amount — the verifier
+      included.</p>
+    </div>
+  </div>
+  <div class="grow"></div>
+  <p class="lead">And a false claim? <b class="accent">It cannot even be constructed.</b>
+  <span class="muted">The witness fails before a proof exists.</span></p>
+  <span class="pagenum">06</span>
+</section>
+
+<!-- 7 · NUMBERS -->
+<section class="slide dark">
+  <p class="kicker">Measured on our hardware · not estimated</p>
+  <h2>The numbers.</h2>
+  <div style="margin-top:2mm">
+    <div class="stat"><span class="v">0.25 s</span><span class="l">to prove a position against a regulatory threshold</span></div>
+    <div class="stat"><span class="v">14 592 B</span><span class="l">proof size · 6 public inputs</span></div>
+    <div class="stat"><span class="v">93 opcodes</span><span class="l">the seize circuit — cheaper than the transfer circuit itself</span></div>
+    <div class="stat"><span class="v">+3 %</span><span class="l">cost of adding a quantitative rule inside the transfer circuit</span></div>
+    <div class="stat"><span class="v">69 tests</span><span class="l">across four circuit packages, plus 9 adversarial probes on-chain</span></div>
+  </div>
+  <span class="pagenum">07</span>
+</section>
+
+<!-- 8 · EVIDENCE -->
+<section class="slide">
+  <p class="kicker">Why believe the problem is real</p>
+  <h2>Because they wrote it down.</h2>
+  <p class="muted" style="font-size:13pt"><code>COMPLIANCE.md:218</code> — OpenZeppelin, on why
+  individual clawback is unsolved:</p>
+  <div class="quote" style="border-left-color:var(--cyan-ink)">
+    <p>"<b>Because the clawback circuit does not have access to <code>vk_A</code></b>… The
+    follow-up revision will pin down whether <code>r_s</code> is supplied as a private witness with
+    an auxiliary opening proof or <b>derived in-circuit from a separately escrowed value</b>."</p>
+  </div>
+  <p class="lead">They name the obstacle <b>and</b> list the remedy. We take the second option and
+  say what to escrow: <code>vk_A</code> itself — then verify it in code.</p>
+  <div class="grow"></div>
+  <p class="muted">Every claim we make about their product is sourced to a file and a line in
+  Appendix A. Trait signatures and verbatim quotes — not our characterisation.</p>
+  <span class="pagenum">08</span>
+</section>
+
+<!-- 9 · LIMITS -->
+<section class="slide">
+  <p class="kicker">What we are not claiming</p>
+  <h2>The honest part.</h2>
+  <div class="cols">
+    <div>
+      <h3>Not production</h3>
+      <p class="muted">Developer-preview primitives; the UltraHonk verifier is unaudited. Testnet
+      only, no real value.</p>
+      <h3 style="margin-top:8mm">Not finished</h3>
+      <p class="muted">The clawback migration — a register-circuit change and re-registration — is
+      priced, not built.</p>
+    </div>
+    <div>
+      <h3>Not solved</h3>
+      <p class="muted">Predicates over <b>encrypted aggregates across accounts</b> — concentration
+      by tranche, subordination ratio between senior and subordinated — remain open. As far as we
+      can determine, on any chain.</p>
+      <h3 style="margin-top:8mm">Not invented</h3>
+      <p class="muted">We implement their specification. The novelty claim is bounded: no public
+      implementation exists in any repository, branch, tag or history.</p>
+    </div>
+  </div>
+  <span class="pagenum">09</span>
+</section>
+
+<!-- 10 · CLOSE -->
+<section class="slide abyss">
+  <p class="kicker">Where this goes</p>
+  <div class="grow" style="display:flex;flex-direction:column;justify-content:center">
+    <h2 style="font-size:40pt">"Regulated" and "public"<br>stop being opposites.</h2>
+    <p class="lead" style="max-width:225mm">The anchor case is a Brazilian receivables fund under
+    CVM 175 — senior and subordinated classes, a register that is public today. The kit serves any
+    regulated issuer with the same paradox.</p>
+    <div style="margin-top:6mm">
+      <span class="chip">MIT · open source</span>
+      <span class="chip">github.com/ThaisFReis/velum</span>
+      <span class="chip">whitepaper · circuits · contracts</span>
+      <span class="chip">seven upstream findings</span>
+    </div>
+  </div>
+  <span class="brandmark">Velum · Stellar Summit SP 2026</span>
+</section>
+
+</body>
+</html>

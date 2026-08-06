@@ -540,6 +540,26 @@ verified by `velum-attest` **v1**, a contract no longer in the address table. A 
 link would land somewhere the submission does not list. Repointed to `f6c02ceb…1213da`, the run
 against the deployed contract.
 
+Then the whitepaper PDF, checked properly this time — by extracting its text and diffing it
+sentence-by-sentence against `WHITEPAPER.md` rather than grepping for numbers we already suspected.
+Two real divergences, neither of which any earlier check would have caught:
+
+- It claimed **5/5 tests** for `experiments/clawback-poc`, which has 9.
+- **§11.7's opening paragraph was missing entirely** — the scalar-field trap: Grumpkin blindings
+  live in BN254's *base* field, so summing them as native `Field` elements agrees with the group
+  only until the sum wraps, and then diverges silently. That is the most technically load-bearing
+  paragraph in the design note, and it was in the Markdown and absent from the artifact a reader
+  actually opens.
+
+Fixed and rebuilt: 16 pages, no `5/5`, the paragraph present. Everything else that differs is
+cosmetic — `≤` against `<=`, a comma, a code-fence language marker.
+
+The root cause was structural, so it got a structural fix: the three HTML sources now live in
+`docs/src/` under version control. They used to sit in a scratch directory outside the repository,
+which is why the same class of drift happened twice without any `grep` over the repo being able to
+see it. `docs/src/README.md` says plainly that `whitepaper.html` is a hand-built parallel document
+and not generated from the Markdown, so an edit to one is an edit owed to the other.
+
 ## 7. Toolchain
 
 `nargo 1.0.0-beta.11` · `bb 0.87.0` (CLI, for local circuit work only) · `@aztec/bb.js 0.87.0`

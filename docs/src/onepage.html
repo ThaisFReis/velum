@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Velum — One Page</title>
+<style>
+  :root{
+    --petrol:#132728; --grey:#e4e4e4; --cyan-ink:#046C88; --cyan:#0EA7C7;
+    --ink:#132728; --muted:rgba(19,39,40,.66); --hair:rgba(19,39,40,.13);
+  }
+  *{box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+  @page{size:A4; margin:10mm 11mm;}
+  html,body{margin:0;padding:0;}
+  body{font-family:Helvetica,Arial,"DejaVu Sans",sans-serif; color:var(--ink);
+       font-size:7.9pt; line-height:1.44;}
+  .mono,code{font-family:"DejaVu Sans Mono",Menlo,monospace;}
+  code{font-size:7pt; background:var(--grey); padding:0 3px; border-radius:2px;}
+  .kicker{font-family:"DejaVu Sans Mono",monospace; font-size:5.9pt; letter-spacing:.26em;
+          text-transform:uppercase; color:var(--cyan-ink); margin:0 0 5px;}
+
+  /* header */
+  .band{background:var(--petrol); color:var(--grey); padding:15px 18px 13px;
+        border-radius:2px; margin-bottom:9px;}
+  .band .kicker{color:var(--cyan);}
+  .band h1{font-size:25pt; margin:0 0 3px; color:#fff; letter-spacing:-.015em; line-height:1;}
+  .band .tag{font-size:10pt; color:#fff; margin:0 0 5px; font-weight:bold;}
+  .band .sub{color:#A0CFE7; font-size:7.8pt; margin:0; max-width:150mm;}
+
+  .cols{display:flex; gap:9px;}
+  .main{flex:1.62;} .side{flex:1;}
+  h2{font-size:9pt; margin:11px 0 3px; letter-spacing:-.01em;}
+  h2:first-child{margin-top:0;}
+  h2 + .rule{border:0; border-top:1px solid var(--petrol); opacity:.45; margin:0 0 6px;}
+  p{margin:5px 0;}
+  .muted{color:var(--muted);}
+
+  table{width:100%; border-collapse:collapse; margin:5px 0; font-size:7.3pt;}
+  th{font-family:"DejaVu Sans Mono",monospace; font-size:5.7pt; letter-spacing:.15em;
+     text-transform:uppercase; color:var(--muted); text-align:left;
+     border-bottom:1px solid var(--petrol); padding:3px 6px 3px 0; vertical-align:bottom;}
+  td{border-bottom:1px solid var(--hair); padding:4px 6px 4px 0; vertical-align:top;}
+  td.q{font-weight:bold; width:22%;}
+
+  .card{background:var(--grey); border-radius:2px; padding:9px 11px; margin-bottom:8px;}
+  .card p:first-child{margin-top:0;} .card p:last-child{margin-bottom:0;}
+
+  .num{display:flex; justify-content:space-between; border-bottom:1px solid var(--hair);
+       padding:3.5px 0; font-size:7.3pt;}
+  .num b{font-family:"DejaVu Sans Mono",monospace; color:var(--cyan-ink); font-size:7.6pt;}
+  .num:last-child{border-bottom:0;}
+
+  blockquote{margin:6px 0; padding:6px 11px; border-left:2.5px solid var(--cyan-ink);
+             font-size:7.5pt; background:#fff;}
+  blockquote p{margin:0;}
+
+  .ship{background:var(--petrol); color:var(--grey); border-radius:2px; padding:10px 13px;
+        margin-top:9px;}
+  .ship .kicker{color:var(--cyan); margin-bottom:5px;}
+  .ship b{color:#fff;}
+  .ship .row{display:flex; gap:16px; font-size:7.4pt;}
+  .ship .row > div{flex:1;}
+  /* code inside the dark band would otherwise inherit the light body colour
+     and vanish against its own light chip background */
+  .ship code{color:var(--petrol); background:#cfd6d6;}
+
+  .foot{margin-top:7px; font-size:6.4pt; color:var(--muted); display:flex;
+        justify-content:space-between; border-top:1px solid var(--hair); padding-top:5px;}
+</style>
+</head>
+<body>
+
+<div class="band">
+  <p class="kicker">Stellar Summit SP 2026 · Enterprise, Compliance &amp; RWA</p>
+  <h1>Velum.</h1>
+  <p class="tag">Holder-attested compliance for Confidential Tokens on Stellar.</p>
+  <p class="sub">A regulated fund can now hide its register of holders <em>and</em> prove it obeys
+  the rules — identity-gated confidential tokens, plus on-chain proof that a position clears a
+  regulatory threshold, without revealing the amount to anyone. Including the verifier.</p>
+</div>
+
+<div class="cols">
+<div class="main">
+
+  <h2>Compliance has two halves. Upstream ships the primitives for both, wired to neither.</h2><hr class="rule">
+  <table>
+    <tr><th style="width:22%">The question</th><th style="width:39%">Upstream today</th><th>Velum</th></tr>
+    <tr>
+      <td class="q">Who may hold?</td>
+      <td>A flat <b>address allowlist</b>. No reason, no expiry, no attesting party — insufficient
+      for a securities regime. Bridging to the RWA identity registry is their issue
+      <b>#766, still open</b>.</td>
+      <td><code>velum-policy</code> — the token asks an <b>ERC-3643/T-REX identity registry</b>:
+      does this holder carry a valid qualified-investor claim from an approved issuer?</td>
+    </tr>
+    <tr>
+      <td class="q">How much may they hold?</td>
+      <td><b>Structurally impossible.</b> <code>is_authorized(account, token) -&gt; bool</code>
+      sees no value — balances are Pedersen commitments. The RWA modules that enforce caps demand
+      cleartext <code>amount: i128</code>. The two cannot meet.</td>
+      <td><code>disclose_balance_ge</code> + <code>velum-attest</code> — the <b>holder</b> proves
+      <i>"my position ≥ T"</i> and a Soroban contract verifies it. Nothing is decrypted; there is
+      nothing to decrypt.</td>
+    </tr>
+  </table>
+
+  <h2>Why the check had to move</h2><hr class="rule">
+  <p>Under FHE a contract compares ciphertexts with no witness, so the check fits inside the
+  transfer. Under Pedersen commitments a proof <i>needs</i> a witness — and for any balance exactly
+  one party holds it. A sender cannot prove anything about the recipient's balance: it has no
+  opening for it, and binding guarantees it cannot find another.</p>
+  <blockquote><p><b>Thesis.</b> Under commitment-based confidentiality, quantitative compliance
+  cannot be transaction-gated. It must be <b>holder-attested</b> — the party that can prove is the
+  party whose balance it is.</p></blockquote>
+  <p class="muted">Not a weaker guarantee: a differently-shaped one. For thresholds that
+  <i>qualify</i> a holder — the qualified-investor minimum, a concentration ceiling — it is exactly
+  what the regulation asks.</p>
+
+  <h2>What we built, on an unmodified upstream token</h2><hr class="rule">
+  <table>
+    <tr><th style="width:31%">Component</th><th>What it is</th></tr>
+    <tr><td><code>velum-policy</code></td><td>Adapter: Confidential Token's policy gate → RWA
+    <code>IdentityVerifier</code>. One KYC registry governs the public asset and the confidential
+    wrapper.</td></tr>
+    <tr><td><code>disclose_balance_ge</code></td><td>The predicate circuit upstream <b>specifies
+    (§9) and does not ship</b> — no public implementation exists in any repository, branch, tag or
+    history.</td></tr>
+    <tr><td><code>velum-attest</code></td><td>On-chain verifier — a component the same spec marks
+    <b>out of scope</b>. Every public input is read from the token and the regulatory profile; the
+    prover supplies only the proof.</td></tr>
+    <tr><td><code>circuits/seize</code></td><td>Answers upstream's open question on individual
+    clawback: premise verified, circuit built, and a partial seizure verified on-chain.</td></tr>
+  </table>
+
+</div>
+<div class="side">
+
+  <h2>Measured, not estimated</h2><hr class="rule">
+  <div class="num"><span>Proof of position</span><b>0.25 s</b></div>
+  <div class="num"><span>Proof size · public inputs</span><b>14 592 B · 6</b></div>
+  <div class="num"><span>Seize proof · circuit cost</span><b>0.33 s · 93 opcodes</b></div>
+  <div class="num"><span>Quantitative rule inside transfer</span><b>+3 %</b></div>
+  <div class="num"><span>Circuit tests (4 packages)</span><b>69 passing</b></div>
+  <div class="num"><span>False claim</span><b>not witnessable</b></div>
+  <div class="num"><span>Full confidential flow, testnet</span><b>1 m 04 s</b></div>
+
+  <h2>The problem, in their words</h2><hr class="rule">
+  <p class="muted" style="margin-top:0"><code>COMPLIANCE.md:218</code> — on why individual clawback
+  is unsolved:</p>
+  <blockquote><p>"<b>Because the clawback circuit does not have access to <code>vk_A</code></b>…
+  The follow-up revision will pin down whether <code>r_s</code> is supplied as a private witness
+  with an auxiliary opening proof or <b>derived in-circuit from a separately escrowed value</b>."</p></blockquote>
+  <p>They name the obstacle and list the remedy. We take that second option and say what to escrow:
+  <code>vk_A</code> itself. Verified in code and on-chain: premise, circuit, and a seizure proof accepted by a Soroban verifier.</p>
+  <p class="muted">Every claim we make about their product is sourced to a file and line in
+  Appendix A of the whitepaper — trait signatures and verbatim quotes, not our characterisation.</p>
+
+  <h2>Anchor case</h2><hr class="rule">
+  <p>A Brazilian receivables fund (FIDC) under <b>CVM 175</b>, tokenized in senior and subordinated
+  classes — <b>Plina Finance</b>. Today its register is public: any competitor reads who subscribed,
+  how much, and when they left. The kit serves any regulated issuer with the same paradox.</p>
+
+</div>
+</div>
+
+<div class="ship">
+  <p class="kicker">Status · testnet only</p>
+  <div class="row">
+    <div><b>Built on</b><br>OpenZeppelin <code>stellar-contracts</code> (Confidential Token +
+    RWA/T-REX), Noir/UltraHonk circuits, Soroban. Nothing upstream is modified.</div>
+    <div><b>Honest limits</b><br>Developer-preview primitives; the UltraHonk verifier is unaudited.
+    Aggregates across accounts — concentration by tranche, subordination ratio — remain open.</div>
+    <div><b>Open source</b><br>MIT · <code>github.com/ThaisFReis/velum</code><br>
+    Whitepaper, circuits, contracts and reproduction steps in the repo.</div>
+  </div>
+</div>
+
+<p class="foot"><span>Velum · one page · 2026-08-05 · figures measured on the authors' hardware</span><span>Not an offer or a solicitation; regulatory mapping is engineering intent, not legal advice.</span></p>
+
+</body>
+</html>

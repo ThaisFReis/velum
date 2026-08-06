@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Velum — Whitepaper</title>
+<style>
+  :root{
+    --petrol:#132728; --grey:#e4e4e4; --cyan-ink:#046C88; --cyan:#0EA7C7;
+    --ink:#132728; --muted:rgba(19,39,40,.68); --hair:rgba(19,39,40,.14);
+  }
+  *{box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+  @page{size:A4; margin:18mm 19mm 20mm 19mm;}
+  html,body{margin:0;padding:0;}
+  body{font-family:Georgia,"DejaVu Serif",serif; color:var(--ink);
+       font-size:9.9pt; line-height:1.62; text-align:justify; hyphens:auto;}
+  .sans{font-family:Helvetica,Arial,"DejaVu Sans",sans-serif;}
+  .mono,code,pre{font-family:"DejaVu Sans Mono",Menlo,Consolas,monospace;}
+
+  /* ---- title block ---- */
+  .title{background:var(--petrol); color:var(--grey); padding:26px 26px 22px;
+         border-radius:2px; margin-bottom:20px; text-align:left;}
+  .title .kicker{font-family:"DejaVu Sans Mono",monospace; font-size:6.8pt; letter-spacing:.3em;
+                 text-transform:uppercase; color:var(--cyan); margin:0 0 10px;}
+  .title h1{font-family:Helvetica,Arial,sans-serif; font-size:23pt; line-height:1.18;
+            margin:0 0 8px; color:#fff; letter-spacing:-.01em;}
+  .title .meta{font-family:Helvetica,Arial,sans-serif; font-size:8pt; color:#A0CFE7; margin:0;}
+  .title .note{font-family:Helvetica,Arial,sans-serif; font-size:7.4pt; color:#A0CFE7;
+               border-top:1px solid rgba(255,255,255,.12); margin-top:12px; padding-top:9px;
+               text-align:left;}
+
+  h2{font-family:Helvetica,Arial,sans-serif; font-size:12.5pt; margin:20px 0 4px;
+     letter-spacing:-.01em; text-align:left; break-after:avoid;}
+  h2 .n{color:var(--cyan-ink); font-family:"DejaVu Sans Mono",monospace; font-size:10pt;
+        margin-right:8px;}
+  h2 + .rule{border:0; border-top:1px solid var(--petrol); margin:0 0 10px; opacity:.5;}
+  h3{font-family:Helvetica,Arial,sans-serif; font-size:10pt; margin:14px 0 4px;
+     text-align:left; break-after:avoid;}
+  p{margin:8px 0;}
+  .abstract{background:var(--grey); padding:14px 18px; border-radius:2px; font-size:9.4pt;}
+  .abstract p:first-child{margin-top:0;} .abstract p:last-child{margin-bottom:0;}
+  ul,ol{margin:6px 0 10px; padding-left:18px;} li{margin:4px 0;}
+  strong{font-weight:bold;}
+  em{font-style:italic;}
+  .muted{color:var(--muted);}
+  code{font-size:8.5pt; background:var(--grey); padding:1px 3px; border-radius:2px;}
+  pre{background:var(--petrol); color:var(--grey); font-size:7.6pt; line-height:1.45;
+      padding:12px 14px; border-radius:2px; overflow:visible; white-space:pre; text-align:left;
+      break-inside:avoid;}
+  pre.light{background:var(--grey); color:var(--ink);}
+  blockquote{margin:12px 0; padding:9px 16px; border-left:3px solid var(--cyan-ink);
+             font-size:10.2pt;}
+  blockquote p{margin:4px 0;}
+  table{width:100%; border-collapse:collapse; margin:10px 0; font-size:8.6pt;
+        font-family:Helvetica,Arial,sans-serif; text-align:left; break-inside:avoid;}
+  th{font-family:"DejaVu Sans Mono",monospace; font-size:6.6pt; letter-spacing:.16em;
+     text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--petrol);
+     padding:5px 9px 5px 0; vertical-align:bottom;}
+  td{border-bottom:1px solid var(--hair); padding:6px 9px 6px 0; vertical-align:top;}
+  .avoid{break-inside:avoid;}
+  hr.sep{border:0; border-top:1px solid var(--hair); margin:22px 0;}
+  .foot{margin-top:18px; padding-top:9px; border-top:1px solid var(--hair);
+        font-family:Helvetica,Arial,sans-serif; font-size:7.2pt; color:var(--muted);
+        text-align:left;}
+  .status{background:var(--petrol); color:#A0CFE7; padding:13px 18px; border-radius:2px;
+          font-family:Helvetica,Arial,sans-serif; font-size:7.8pt; margin-top:16px;
+          text-align:left;}
+  .status b{color:#fff;}
+</style>
+</head>
+<body>
+
+<div class="title">
+  <p class="kicker">Whitepaper · draft v0.1 · 2026-08-05</p>
+  <h1>Velum: Holder-Attested Compliance for<br>Confidential Tokens on Stellar</h1>
+  <p class="meta">Stellar Summit SP 2026 · Enterprise, Compliance &amp; RWA (OpenZeppelin + Nethermind)</p>
+  <p class="note">Written in English: the intended readers are the lane's sponsors and the
+  upstream maintainers we hope to contribute back to. A Portuguese edition can follow.</p>
+</div>
+
+<h2 class="sans">Abstract</h2><hr class="rule">
+<div class="abstract">
+<p>Confidential Tokens give Stellar hidden balances with a designated auditor — confidentiality
+without anonymity. That is the right shape for regulated finance, but it leaves regulated issuers
+with only half a compliance story. The token's authorization interface receives an address and
+nothing else, so it can express <em>who may hold</em> and never <em>how much they may hold</em>:
+balances are Pedersen commitments, and the interface has no opening for them.</p>
+<p>We show this is not an oversight but a structural consequence of commitment-based
+confidentiality, and that it has a specific remedy. Under fully homomorphic encryption a contract
+can evaluate a predicate over ciphertext with no witness at all; under Pedersen commitments with
+zero-knowledge proofs, someone must know the opening — and for any given balance exactly one party
+does: its holder. Quantitative compliance therefore cannot be <em>transaction-gated</em>; it must be
+<strong>holder-attested</strong>.</p>
+<p>Velum implements that conclusion. It contributes (i) <code>velum-policy</code>, an adapter making
+the Confidential Token's authorization gate consult an ERC-3643/T-REX identity registry rather than
+a flat address list; (ii) <code>disclose_balance_ge</code>, an implementation of the predicate
+disclosure circuit that OpenZeppelin's own selective-disclosure specification defines (§9) and no
+public implementation provides; and (iii) <code>velum-attest</code>, an on-chain verifier for that
+proof — a component the same specification marks out of scope (§§5.4, 14). A holder proves
+<em>"my confidential position is at least T"</em>, a Soroban contract checks it, and no party —
+including the contract — learns the position. Proving takes 0.25 s and adds 3% to a transfer
+circuit's constraint count when the same technique is applied there.</p>
+</div>
+
+<h2><span class="n">1</span><span class="sans">The problem</span></h2><hr class="rule">
+<p>An issuer tokenizing a regulated fund on a public ledger faces an uncomfortable trade. The
+ledger's transparency, normally a feature, publishes the register of holders: who subscribed, how
+much, and when they left. In retail this never bit — a small position hides in the crowd and
+attracts no professional adversary. Institutionally the arithmetic inverts. A pool of ten positions
+is de-anonymized by correlating subscription timing with off-chain events, and the information has
+a paying audience: competitors, counterparties, trading desks.</p>
+<p>Confidential Tokens address exactly this. Balances and transfer amounts become Pedersen
+commitments on the Grumpkin curve; every state transition carries an UltraHonk zero-knowledge proof
+verified on-chain; addresses stay public and a designated auditor holds a decryption key. Deposits
+and withdrawals remain in cleartext, which for a fund maps neatly onto subscription and redemption
+being auditable while the internal register stays private.</p>
+<p>What remains missing is compliance with teeth.</p>
+
+<h2><span class="n">2</span><span class="sans">Two halves of compliance</span></h2><hr class="rule">
+<p>Regulation asks two questions of a fund's register, and they have different shapes.</p>
+<p><strong>Qualitative — who may hold?</strong> The token's compliance extension consults an
+external policy:</p>
+<pre class="light">trait Policy {
+    fn is_authorized(e: Env, account: Address, token: Address) -&gt; bool;
+}</pre>
+<p>The reference implementations answer from a flat allowlist or blocklist. That is insufficient for
+a securities regime: an address on a list carries no reason, no expiry, and no attesting party.
+Brazil's CVM 175, like ERC-3643's T-REX model, asks whether the holder carries a <em>valid claim</em>
+— qualified investor, say — issued by an <em>approved</em> claim issuer. The RWA module in the same
+library answers precisely that question, through <code>IdentityVerifier::verify_identity</code>. The
+two modules do not know about each other. Bridging them is upstream issue #766, open since
+2026-07-06 with no release at the time of writing.</p>
+<p><strong>Quantitative — how much may they hold?</strong> Minimum ticket, per-investor cap,
+concentration limit, subordination ratio between tranches. Every one of these is a statement about a
+<em>value</em>, and this is where the interface runs out: <code>is_authorized</code> receives an
+address. It sees no amount and no balance, because there is no amount and no balance to see — only
+commitments.</p>
+<p>Both halves of this section are sourced to upstream's code and specifications in
+<strong>Appendix A</strong> — including the trait signatures, the sentence stating that the token's
+only agreement with a policy is a boolean, and the open issue that names the missing bridge.</p>
+
+<h2><span class="n">3</span><span class="sans">Why the enforcement point must move</span></h2><hr class="rule">
+<p>It is tempting to conclude that the fix is a richer policy interface. It is not. Consider where
+the enforcing party would have to obtain the value.</p>
+<p>The confidential token's lifecycle hooks reveal the boundary precisely:</p>
+<table class="avoid">
+  <tr><th style="width:56%">Hook</th><th>Sees the amount?</th></tr>
+  <tr><td><code>on_deposit(from, to, amount: i128)</code></td><td>yes — deposits are public</td></tr>
+  <tr><td><code>on_withdraw(from, to, amount: i128, …)</code></td><td>yes — withdrawals are public</td></tr>
+  <tr><td><code>on_transfer(from, to, payload)</code></td><td><strong>no</strong> — the amount is a commitment</td></tr>
+</table>
+<p>Those two signatures are reproduced verbatim in Appendix A.1, alongside the RWA compliance
+hooks that expect cleartext amounts and balances — the two worlds cannot meet, and the reason is a
+type signature.</p>
+<p>So amount rules <em>can</em> be enforced where value crosses the wrapper's boundary. But in the
+realistic fund topology the investor never deposits: the distributor holds the public balance and
+credits investors by confidential transfer, precisely so that individual positions are not derivable
+from public deposits. The subscription amount is then inside a confidential transfer, and invisible
+again.</p>
+<p>Could the sender prove the recipient's resulting balance respects a cap? No. The recipient's
+balance is a commitment <code>C = v·G + r·H</code> whose opening <code>(v, r)</code> the sender does
+not possess, and Pedersen binding guarantees it cannot find another. The auditor could decrypt — but
+that makes every transfer wait on an off-chain party, and turns a compliance check into a custody
+dependency.</p>
+<p>This is where the cryptographic substrate matters. Under FHE — the route taken on the EVM by
+ERC-7984's balance-cap hook module — a contract compares ciphertexts directly and needs no witness,
+so the check can sit inside the transfer. Under commitments plus zero-knowledge, a proof requires a
+witness, and the witness is the opening. For any balance, exactly one party holds it: the account
+holder, who retains <code>(v_s, r_s)</code> as ordinary wallet state.</p>
+<blockquote><p><strong>Thesis.</strong> Under commitment-based confidentiality, quantitative
+compliance cannot be transaction-gated. It must be <strong>holder-attested</strong>: the party that
+can prove is the party whose balance it is.</p></blockquote>
+<p>This is not a weaker guarantee, only a differently-shaped one. It relocates the check from "every
+transfer is screened" to "a holder demonstrates standing, and the demonstration is a fact on the
+ledger". For thresholds that qualify a holder — the qualified-investor minimum, a concentration
+ceiling — that is exactly the semantics the regulation wants.</p>
+
+<h2><span class="n">4</span><span class="sans">Architecture</span></h2><hr class="rule">
+<p>Velum is three components over the unmodified upstream token.</p>
+<pre>                   ┌──────────────────────┐
+                   │  RWA identity stack  │  claim topics · claim issuer
+                   │  (T-REX / ERC-3643)  │  identity · identity registry
+                   └──────────┬───────────┘
+                              │ verify_identity(account)
+                   ┌──────────┴───────────┐
+                   │    velum-policy      │  Policy::is_authorized
+                   └──────────┬───────────┘
+                              │ consulted on every operation
+   ┌──────────────────────────┴──────────────────────────┐
+   │           Confidential Token (unmodified)           │
+   │   PVK_A · C_spend · commitments · UltraHonk proofs  │
+   └──────────────────────────┬──────────────────────────┘
+                              │ confidential_balance(account)   [read]
+                   ┌──────────┴───────────┐
+                   │    velum-attest      │  ← proof only, from the holder
+                   │  on-chain verifier   │  → Attestation{threshold, ledger}
+                   └──────────────────────┘
+                              ▲
+                   disclose_balance_ge (Noir/UltraHonk)</pre>
+
+<h3>4.1 · velum-policy — identity, not addresses</h3>
+<p>An adapter, and deliberately small. It resolves an impedance mismatch: the RWA verifier signals
+failure by panicking, the token's policy expects a boolean, and a panic crossing a cross-contract
+call would abort the transaction instead of letting the token reject the operation cleanly. The call
+therefore goes through the generated client's <code>try_</code> variant, folding the error into
+<code>false</code>. The claim logic stays in the RWA registry — shared with the public asset — and
+the confidentiality logic stays in the token. One KYC registry governs both.</p>
+
+<h3>4.2 · disclose_balance_ge — the predicate circuit</h3>
+<p>Upstream's <code>SELECTIVE_DISCLOSURE.md</code> §9 specifies a D-balance circuit in two shapes: a
+value-revealing form that seals the balance to a designated recipient, and a <strong>predicate-only</strong>
+form (<code>disclose_balance_ge</code> / <code>disclose_balance_le</code>) in which the proof's mere
+validity asserts the inequality and there is nothing to decrypt. The specification is complete —
+public inputs, private witnesses, constraints D1/D2/DB3/DB4/D5. The distributed circuits implement
+<code>disclose_recipient</code> and <code>disclose_sender</code> only.</p>
+<p>We implement the <code>ge</code> predicate to that specification:</p>
+<table class="avoid">
+  <tr><th style="width:8%">#</th><th style="width:40%">Constraint</th><th>Purpose</th></tr>
+  <tr><td>D1</td><td><code>vk_A = Poseidon2(δ_vk, sk_A, addr_f)</code></td><td>contract-bound viewing key</td></tr>
+  <tr><td>D2</td><td><code>PVK_A = vk_A · H</code></td><td>binds the proof to the on-chain account record</td></tr>
+  <tr><td>DB3</td><td><code>C_spend = v_s·G + r_s·H</code></td><td>opening of the current balance; by Pedersen binding the witnessed <code>v_s</code> <em>is</em> the balance</td></tr>
+  <tr><td>D5</td><td><code>v_s ∈ [0, 2¹²⁷)</code></td><td>prevents a wrapped-negative <code>v_s</code> satisfying DB4</td></tr>
+  <tr><td>DB4</td><td><code>v_s ≥ v_threshold</code></td><td>the predicate, as a non-negative difference</td></tr>
+</table>
+<p>…and add two constraints beyond it:</p>
+<table class="avoid">
+  <tr><td style="width:8%">DB4b</td><td style="width:40%"><code>v_threshold ∈ [0, 2¹²⁷)</code></td><td>a threshold near the field modulus would make DB4 vacuous by wrap-around</td></tr>
+  <tr><td style="width:8%">DB3b</td><td style="width:40%"><code>C_receive = v_r·G + r_r·H</code>, and DB4 bounds <code>v_s + v_r</code></td><td>makes the predicate one about the <strong>position</strong>, not just the spendable part</td></tr>
+</table>
+<p><code>v_threshold</code> is contract-supplied rather than prover-supplied, so DB4b is defence in
+depth rather than a soundness necessity — but it makes the circuit's guarantee independent of how
+carefully a deployment populates its profile, at negligible cost.</p>
+<p>DB3b is a different matter, and it is the one place where we think the specification is wrong.
+Section 9's verifier flow resolves exactly two pieces of account state: <code>PVK_A</code> and
+<code>C_spend</code>. A confidential account has <em>three</em> value-bearing fields, and
+<code>C_receive</code> — where incoming transfers accumulate until the holder rolls them over — is
+not among them. The predicate is therefore about the spendable balance, not the position.</p>
+<p>For the <code>ge</code> shape that is sound but slack: spendable ≤ position, so the circuit can
+only under-claim. The cost is a false negative — a holder with 400 000 spendable and 200 000
+received-but-not-merged holds 600 000 and cannot prove they clear 500 000.</p>
+<p>For the <code>le</code> shape, which the same sentence of the specification names, the identical
+omission inverts from slack to unsound. A concentration ceiling is exactly the regulatory rule one
+would build from <code>disclose_balance_le</code>, and a holder subject to it can park value in
+<code>C_receive</code> and prove compliance while holding more than the cap. Nothing in the
+specification flags this, and the two variants are introduced as though they were mirror images.
+They are not: the omission is conservative in one direction and load-bearing in the other. We
+reported it upstream (finding 7) and closed it here by binding both commitments — which our own
+<code>seize</code> circuit already had to do. It costs 43 → 67 ACIR opcodes.</p>
+
+<h3>4.3 · velum-attest — verification on-chain</h3>
+<p>Upstream verifies disclosure proofs entirely off-chain (§15.1) and marks an on-chain verifier out
+of scope, noting that the predicate shape is what such a verifier would consume (§14). The soundness
+condition is the specification's own trust boundary (§5.2): <strong>every public input must
+originate somewhere other than the prover.</strong></p>
+<p><code>velum-attest</code> satisfies it by construction:</p>
+<table class="avoid">
+  <tr><th style="width:34%">Public input</th><th>Source</th></tr>
+  <tr><td><code>PVK_A</code>, <code>C_spend</code></td><td>read cross-contract from the confidential token, live</td></tr>
+  <tr><td><code>addr_f</code></td><td>pinned at construction (see §7.1)</td></tr>
+  <tr><td><code>v_threshold</code></td><td>the contract's own regulatory profile, owner-managed</td></tr>
+  <tr><td>proof</td><td>the only value the caller supplies</td></tr>
+</table>
+<p>A caller substituting its own commitment merely verifies against a blob the contract never
+assembles. On success the contract records <code>Attestation { threshold, attested_at_ledger }</code>
+and emits an event.</p>
+<p>The entry point requires no authorization. A proof is self-authenticating: D1/D2 bind it to the
+account's own viewing key, so no one can produce one for an account they do not control, and
+relaying a valid proof only records a fact that account could have recorded itself.</p>
+
+<h2><span class="n">5</span><span class="sans">Freshness and replay</span></h2><hr class="rule">
+<p><code>C_spend</code> is read from live state, so a proof stops verifying the moment the balance
+moves. This gives replay resistance without a nonce: an old proof can only be presented against the
+state it was made for, where it remains true.</p>
+<p>The consequence is that an attestation is a statement about the position <em>as of</em> its
+ledger. Consumers needing a current answer re-attest; consumers accepting a window read
+<code>attested_at_ledger</code> and decide. Raising the threshold does not silently upgrade old
+records — each attestation retains the threshold it was checked against.</p>
+
+<h2><span class="n">6</span><span class="sans">What this does not solve</span></h2><hr class="rule">
+<p>Stated plainly, because a compliance claim that quietly enforces nothing is worse than no
+claim.</p>
+<p><strong>Aggregates.</strong> Concentration ("no holder above X% of the fund") and the
+subordination ratio between senior and subordinated tranches are statements over <em>sums across
+accounts</em>. Pedersen commitments are additively homomorphic, so the sums are computable on-chain
+— but opening them requires a party that knows every contributing opening, which is the auditor.
+Concentration against a <em>public</em> total is self-provable by the holder and fits this
+construction directly; a ratio between two encrypted tranche totals does not. We consider this the
+most interesting open problem in the area.</p>
+<p><strong>Third-party balance caps.</strong> A cap on a <em>recipient's</em> balance at transfer
+time remains unprovable for the reasons in §3. Enforcement at consolidation (<code>merge</code>) is
+the natural alternative — the holder proves the merged balance respects the cap — but
+<code>merge</code> carries no proof upstream, so this requires a contract-level fork we did not
+attempt.</p>
+<p><strong>Involuntary movement.</strong> Everything above is holder-attested, which by
+construction excludes the case where the holder will not cooperate: individual clawback. That is
+upstream's own open problem, and §11 shows it reduces to a question with a short answer.</p>
+<p><strong>The accept/reject side channel.</strong> A verified attestation reveals one bit: the
+position is at or above the threshold. Repeated attestations against a moving threshold would
+binary-search the balance. Deployments should treat the threshold as policy, not as a query
+interface. Upstream documents the analogous leak in its own hook design.</p>
+<p><strong>Audit status.</strong> The UltraHonk backend and the confidential circuits are unaudited
+developer preview. Testnet only. Our own circuit inherits that status and adds itself to the
+surface.</p>
+
+<h2><span class="n">7</span><span class="sans">Findings for upstream</span></h2><hr class="rule">
+<p>Three defects and gaps found while building; we intend to report all three.</p>
+<p><strong>7.1 · <code>addr_f</code> is not readable by third parties.</strong> The
+address-as-field element lives in the token's instance storage and <code>address_to_field</code> is
+<code>pub(crate)</code>, so an external verifier can neither read nor recompute it. §5.3 of the
+disclosure specification lists it as "recomputed from the token contract address", which no
+third-party contract can do. <code>velum-attest</code> pins it at construction — still not
+prover-supplied, so the trust boundary holds — but a public <code>address_as_field()</code> accessor
+on <code>ConfidentialToken</code> would let it be read live like every other public input.</p>
+<p><strong>7.2 · A documented command that cannot run.</strong> <code>examples/rwa/sign-claim</code>
+is listed in the workspace <code>exclude</code> set while declaring
+<code>authors.workspace = true</code>. The README's
+<code>cargo run --manifest-path examples/rwa/sign-claim/Cargo.toml</code> therefore fails with
+<em>"failed to find a workspace root"</em>.</p>
+<p><strong>7.3 · <code>--optimize=false</code> is incompatible with stellar-cli ≥ 25.2</strong>,
+which treats <code>--optimize</code> as a boolean flag; the demo's deploy script fails at the first
+contract.</p>
+
+<h2><span class="n">8</span><span class="sans">Evaluation</span></h2><hr class="rule">
+<p>Measured on commodity hardware (12 threads), <code>nargo 1.0.0-beta.11</code>,
+<code>bb 0.87.0</code>.</p>
+<table class="avoid">
+  <tr><th style="width:52%">Quantity</th><th>Value</th></tr>
+  <tr><td><code>disclose_balance_ge</code> circuit tests</td><td>10 / 10 pass</td></tr>
+  <tr><td>Witness generation</td><td>0.07 s</td></tr>
+  <tr><td>Verification-key size</td><td>1 764 B</td></tr>
+  <tr><td>Proof generation</td><td><strong>0.25 s</strong></td></tr>
+  <tr><td>Proof size</td><td>14 592 B</td></tr>
+  <tr><td>Public inputs</td><td>6 fields (192 B)</td></tr>
+  <tr><td>Verification</td><td>succeeds; a false claim is not even witnessable</td></tr>
+</table>
+<p>The test suite covers acceptance above, at, and with a zero threshold; and rejection for a
+balance below threshold, a false commitment opening, another holder's secret key, replay against a
+different token (<code>addr_f</code>), a stale commitment, and a malformed threshold near the field
+modulus.</p>
+<p>As a separate datapoint on cost, applying the same technique inside the <em>transfer</em> circuit
+— a per-operation cap and a minimum ticket, both over the encrypted amount — raised its constraint
+count from 133 to 137 ACIR opcodes (<strong>+3%</strong>) with all 28 upstream tests still passing.
+Range comparison is already the circuit family's dominant idiom; regulatory predicates are cheap
+guests.</p>
+<p>For context on the surrounding stack: building the seven upstream contracts takes 57 s, deploying
+them to testnet 1 m 56 s, and a full confidential flow (register → deposit → merge → transfer →
+merge → withdraw, every proof verified on-chain) 1 m 4 s.</p>
+
+<h2><span class="n">9</span><span class="sans">Related work</span></h2><hr class="rule">
+<p><strong>FHE on the EVM.</strong> OpenZeppelin's Confidential Contracts v0.5 ships
+<code>ERC7984BalanceCapHookModule</code> and <code>ERC7984HolderCapHookModule</code>, audited June
+2026, alongside an <code>ERC7984IdentityCheck</code> consuming an ERC-3643-style registry. Fully
+homomorphic encryption lets the pre-transfer hook compare ciphertexts directly and zero the amount
+on failure, with no witness and no prover. This is the closest prior art and the cleanest contrast:
+it does not face the prover problem, and correspondingly needs a different execution substrate. Zama
+has announced a confidentiality layer for the T-REX Ledger; the chain's mainnet is scheduled after
+this writing.</p>
+<p><strong>Auditor keys without value rules.</strong> Avalanche's eERC (zk-SNARKs with partially
+homomorphic encryption, rotatable auditor keys) and Solana's Token-2022 Confidential Balances
+(ElGamal with equality, range and validity proofs, optional auditor key) both deliver
+confidentiality with audit access, and neither enforces quantitative limits over encrypted
+balances.</p>
+<p><strong>Permissioned ledgers.</strong> Canton and bank-operated networks resolve privacy and
+compliance together by restricting who sees the ledger at all, at the cost of permissionless
+composability and shared liquidity.</p>
+<p><strong>Primitives.</strong> Range proofs and proof-of-solvency are long-settled cryptography.
+What has been missing is not the primitive but the composition: a regulatory predicate over a
+confidential balance, verified by a contract, wired to an identity registry.</p>
+
+<h2><span class="n">10</span><span class="sans">Regulatory mapping</span></h2><hr class="rule">
+<p>The anchor case is a Brazilian receivables fund (FIDC) under CVM 175, tokenized as senior and
+subordinated classes. The mapping is deliberately narrow:</p>
+<table class="avoid">
+  <tr><th style="width:33%">Rule</th><th style="width:42%">Mechanism</th><th>Status</th></tr>
+  <tr><td>Holder must be a qualified investor</td><td>claim topic in the identity registry, enforced on every operation via <code>velum-policy</code></td><td>implemented</td></tr>
+  <tr><td>Position must clear the qualified-investor minimum</td><td><code>disclose_balance_ge</code> + <code>velum-attest</code></td><td>implemented</td></tr>
+  <tr><td>Position must stay under a concentration ceiling (public total)</td><td><code>disclose_balance_le</code>, same construction</td><td>specified, not built</td></tr>
+  <tr><td>Subordination ratio between classes</td><td>encrypted aggregate across accounts</td><td>open problem (§6)</td></tr>
+  <tr><td>Issuer freeze, sanction response</td><td>upstream freeze and SAC passthrough</td><td>inherited</td></tr>
+</table>
+<p>A jurisdiction is expressed as a profile — claim topics, thresholds, modules — so the machine is
+reusable and the regulation is the configuration.</p>
+
+<h2><span class="n">11</span><span class="sans">Design note: individual clawback under confidentiality</span></h2><hr class="rule">
+<p>We did not implement the migration this requires; §11.6 prices it. Everything short of it,
+however, is <strong>implemented and proven</strong>: the cryptographic premise is verified against
+the unmodified upstream circuit library (<code>experiments/clawback-poc</code>, 9/9 tests), and the
+seize circuit itself is built, tested and <strong>verified on-chain</strong>
+(<code>circuits/seize</code> — 12/12 tests, 93 ACIR opcodes; <code>velum-seize</code> on testnet
+verified a seizure bounded by a live confidential position without the position being readable, and
+an <code>alpha</code> above the balance is not even witnessable). The note is included because it answers a question upstream left open,
+and because the answer turns out to be short.</p>
+
+<h3>11.1 · The problem</h3>
+<p>Once value enters the wrapper, the underlying SEP-41 ledger records the <em>contract</em> as
+holder. An issuer's SAC-level clawback would drain the pool, debiting unrelated accounts.
+Individual seizure must instead extract value from one confidential account and settle it over a
+transparent path — and the contract does not know that account's balance.</p>
+<p>Upstream specifies such a flow (<code>COMPLIANCE.md</code> §5): the admin authorizes, the auditor
+supplies knowledge, and a circuit bounds the seized amount by the target's balance. The
+specification then defers its own crux, the treatment of the spendable-balance blinding
+<code>r_s</code>:</p>
+<blockquote><p>"The follow-up revision will pin down whether <code>r_s</code> is supplied as a
+private witness with an auxiliary opening proof or derived in-circuit from a separately escrowed
+value."</p></blockquote>
+<p>The passage is quoted at greater length in Appendix A.4, where upstream also states the
+obstacle outright — <em>"because the clawback circuit does not have access to
+<code>vk_A</code>"</em> — and lists "derived in-circuit from a separately escrowed value" as one of
+the two candidate remedies. This note takes that option and names the value.</p>
+<p>The difficulty is real. The auditor recovers the <em>value</em> <code>v_s</code> from the
+sender-channel checkpoint, and the full opening <code>(v_r, r_r)</code> of the receiving side by
+replaying per-transfer ciphertexts. It cannot recover <code>r_s</code>, which derives from the
+holder's viewing key.</p>
+
+<h3>11.2 · The observation</h3>
+<p><code>r_s</code> is not sampled. The shared circuit library states the rule the protocol uses in
+every owner-initiated operation (constraints W5 / T10 / S9 / V6):</p>
+<pre class="light">derive_spend_r(vk, sigma) = Poseidon2(SPEND_RANDOMNESS, [vk, sigma])</pre>
+<p>It is a deterministic function of the holder's viewing key and a nonce <code>sigma</code> that is
+<strong>public</strong> — it travels in the event. The auditor has <code>sigma</code>. The only
+missing input is <code>vk_A</code>.</p>
+<p>The open question therefore reduces to one: <em>can the auditor obtain <code>vk_A</code>?</em></p>
+<p>The reduction goes further than the specification suggests. The balance checkpoint emitted on
+every owner-initiated operation is <code>b~ = v + Poseidon2(ENCRYPTED_BALANCE, [vk, sigma])</code>
+— also decryptable with <code>vk</code> alone. So <code>vk</code> recovers the <strong>value and
+the blinding</strong> of the spendable side directly, without the per-transfer ECDH channel the
+upstream sketch leans on. We verified both recoveries, and their negatives, against the unmodified
+circuit library (<code>experiments/clawback-poc</code>, 9/9 tests).</p>
+
+<h3>11.3 · Proposal: escrow the viewing key at registration</h3>
+<p>The register circuit is five constraints (R1–R5) and <strong>already computes <code>vk</code>
+in-circuit</strong> (R2). The account also already binds an <code>auditor_id</code> at registration.
+We propose adding, at that point, an auditor-bound ciphertext of <code>vk</code>:</p>
+<table class="avoid">
+  <tr><th style="width:8%">#</th><th>Added constraint</th></tr>
+  <tr><td>R6</td><td><code>R_esc = r_esc · H</code>, <code>r_esc ≠ 0</code> — ephemeral key for the escrow</td></tr>
+  <tr><td>R7</td><td><code>s_esc = ECDH(r_esc, K_aud)</code> — shared secret with the account's chosen auditor</td></tr>
+  <tr><td>R8</td><td><code>vk_masked = vk + Poseidon2(ESC_VK, s_esc.x, addr_f)</code> — masked viewing key, emitted</td></tr>
+</table>
+<p>Four to six constraints over gadgets the circuit family already ships (<code>scalar_mul</code>,
+<code>ecdh</code>, <code>poseidon_with_domain</code>) — the same pattern the transfer circuits use
+for their auditor ciphertexts. Idiomatic, not new machinery.</p>
+
+<h3>11.4 · Why this is safe</h3>
+<p><strong>It grants no new knowledge.</strong> The auditor already recovers <code>v_s</code> from
+the checkpoint and every transfer amount from the auditor channel; that is its designed role. The
+escrow converts knowledge the auditor already holds into knowledge it can <em>prove in circuit</em>.
+Marginal privacy loss: nil.</p>
+<p><strong>It grants no spending power.</strong> Moving value requires <code>sk</code> — the transfer
+circuit's T1 binds <code>Y = sk · H</code> — and <code>vk = Poseidon2(VIEWING_KEY, sk, addr_f)</code>
+is one-way. An auditor holding <code>vk</code> can open commitments; it cannot produce a
+transfer.</p>
+<p><strong>It grants no power to forge attestations.</strong> The predicate circuit of §4.2 takes
+<code>sk</code> as a private witness and derives <code>vk</code> from it (D1). A party holding
+<code>vk</code> alone cannot satisfy D1, so it cannot manufacture a <code>disclose_balance_ge</code>
+proof in a holder's name.</p>
+<p><strong>It is scoped by the account.</strong> The escrow is encrypted to the auditor key the
+account itself selected at registration; a deployment restricting that choice (upstream's
+<code>ApprovedAuditorHooks</code> pattern) restricts the escrow with it.</p>
+
+<h3>11.5 · What it unlocks: partial seizure, not merely total</h3>
+<p>Total seizure would not need any of this. Zeroing both commitments to the identity point leaves
+an opening of <code>(0, 0)</code> that everyone knows, so the holder still operates afterwards; the
+only hard part is establishing the amount.</p>
+<p>Partial seizure is what needs the escrow, and gets it for free. With <code>vk</code> the auditor
+derives not only the current blinding but the <em>post-seizure</em> one,</p>
+<pre class="light">r_s_new = derive_spend_r(vk_A, sigma_new)</pre>
+<p>which is the protocol's own canonical rule — the same value the wallet would have derived. The
+rewritten balance therefore stays openable by the holder through ordinary checkpoint recovery, with
+no out-of-band handoff. The seize circuit then reduces to opening proofs with the seized amount
+<code>alpha</code> as a <strong>public</strong> input and a range constraint
+<code>alpha ≤ v_s + v_r</code>.</p>
+<p>This round-trip is one of the verified tests: the auditor writes the post-seizure state under
+the canonical rule, and the holder — using only <code>sk</code> and the event, as in ordinary
+wallet recovery — re-derives the same blinding and opens the same commitment.</p>
+<p>The circuit exists (<code>circuits/seize</code>, constraints Z1–Z7). Z1 binds the escrowed
+<code>vk</code> to the target's on-chain viewing key, so a proof built for one account cannot be
+applied to another; Z6/Z7 force the post-seizure commitment and checkpoint to match
+<code>remaining</code> under the canonical derivations, so the authority can neither short-change
+the holder nor desynchronize its wallet. At 93 ACIR opcodes it is cheaper than the transfer
+circuit itself.</p>
+<p>It also verifies on-chain. <code>contracts/velum-seize</code> reads <code>PVK_A</code>,
+<code>C_spend</code> and <code>C_receive</code> from the token, assembles the eleven public inputs
+and verifies the proof — so a seizure is settled against state the authority cannot substitute. Two
+limits are worth stating in the same breath: no value moves, because rewriting the commitments
+needs a <code>seize</code> entry point inside the token that we did not fork; and the escrow below
+is simulated with a test account's keys. What is established is that the verification half works
+on-chain, which was the half in doubt.</p>
+<p>The <em>receiving</em> side closes as well. <code>C_receive</code> accumulates two kinds of
+contribution: confidential transfers, whose per-transfer openings the auditor already recovers
+from its designed channel, and deposits — which the contract adds as <code>amount * G</code> with
+<strong>zero blinding</strong>, the amount being public. Every term of the receiving commitment
+therefore has an opening the auditor can produce.</p>
+
+<h3>11.6 · Cost</h3>
+<p>The cryptography is the cheap part; the migration is not.</p>
+<ul>
+  <li>A changed register circuit means a <strong>new verification key and no backward
+  compatibility</strong>: every existing account must re-register.</li>
+  <li>It forks the token contract's register entry point and public-input assembly.</li>
+  <li>It requires auditor-side SDK work: event replay, derivation, proving.</li>
+</ul>
+<p>For a protocol still in developer preview, before mainnet and before large-scale registration,
+this is the cheapest moment such a change will ever have.</p>
+
+<h3>11.7 · Residual questions</h3>
+<p><strong>Blinding aggregation is not field addition.</strong> Pedersen blindings are Grumpkin
+scalars, and Grumpkin's scalar field is BN254's <em>base</em> field — a different modulus than the
+circuit's native <code>Field</code>. Summing receiving-side contributions as field elements
+coincides with the group only while the sum does not wrap, so real Poseidon-sized blindings diverge
+<strong>silently</strong>. The auditor SDK must aggregate in the curve's scalar arithmetic; the
+circuit takes the aggregate as a witness and checks the opening, which keeps non-native arithmetic
+out of the constraint system. Both behaviours are pinned by tests.</p>
+<p><strong>Auditor key rotation.</strong> Escrow ciphertexts bind to the auditor key current at
+registration. Rotation needs either retention of the old key for historical accounts or a re-escrow
+flow.</p>
+<p><strong>Governance of a write surface.</strong> Seizure lets an admin-and-auditor pair move value
+without the holder. Deployments should separate freeze, policy and seize roles, and consider a
+timelock and a mandatory event trail. The two-party split is a property of the construction, not a
+cryptographic impossibility.</p>
+<p><strong>Regulatory sufficiency.</strong> Freeze is immediate and unilateral; seizure is
+coordinated and slow. In most regimes the legal act happens off-chain and the on-chain move is
+execution — so freeze is what must never fail, and seizure is the convenience.</p>
+
+<h2><span class="n">12</span><span class="sans">Conclusion</span></h2><hr class="rule">
+<p>Confidentiality built on commitments does not merely make quantitative compliance harder; it
+moves where the check can happen. The party that can prove a statement about a balance is the party
+that holds it. Once that is accepted, the design follows: the holder proves, a contract verifies,
+and the result is a fact on the ledger that other contracts can consume — while the value stays
+hidden from everyone, verifier included.</p>
+<p>Velum implements that for the two rules a regulated fund needs first, on top of an unmodified
+upstream token, using a circuit its own specification already describes. The remaining hard problem
+— predicates over encrypted aggregates across accounts — is, as far as we can determine, unsolved on
+any chain.</p>
+
+<hr class="sep">
+
+<hr class="sep">
+
+<h2 class="sans" style="font-size:12.5pt">Appendix A — The gap in upstream's own words</h2><hr class="rule">
+<p>Every load-bearing claim in §§2, 3 and 11 is a statement about someone else's codebase, so this
+appendix sources each one to a line of that codebase. Nothing here is our characterisation: the
+quotes are verbatim and the signatures are copied as they appear.</p>
+<p><strong>How to verify.</strong> Two revisions are involved, and the distinction matters. The
+Confidential Token <em>implementation</em> lives only on
+<code>feat/confidential-verifier-ultrahonk</code>, which we pin at <code>539968f</code>; the
+<em>specifications</em> were merged to <code>main</code>, which we read at <code>9b5ed96</code>
+(2026-07-31). Paths below are relative to <code>packages/tokens/src/</code> in
+<code>OpenZeppelin/stellar-contracts</code>.</p>
+
+<h3>A.1 · The authorization interface cannot see value</h3>
+<p><code>confidential/compliance/mod.rs:41</code></p>
+<pre class="light">pub trait Policy {
+    /// Returns `true` iff `account` is authorized to interact with
+    /// `token`.
+    fn is_authorized(e: Env, account: Address, token: Address) -&gt; bool;
+}</pre>
+<p>An address, a token, a boolean. The specification states the consequence plainly
+(<code>confidential/docs/COMPLIANCE.md:81</code>):</p>
+<blockquote><p>"Membership management, list semantics, and identity proofs live entirely inside
+the policy contract. <strong>The token's only agreement with the policy is the boolean return
+value.</strong>"</p></blockquote>
+<p>The lifecycle hooks draw the same boundary from the other side.
+<code>confidential/mod.rs:175</code> and <code>:185</code>:</p>
+<pre class="light">fn on_deposit(e: &amp;Env, from: &amp;Address, to: &amp;Address, amount: i128) {}
+fn on_transfer(e: &amp;Env, from: &amp;Address, to: &amp;Address, payload: &amp;TransferPayload) {}</pre>
+<p>A deposit carries a cleartext <code>i128</code>. A confidential transfer carries a payload of
+commitments and a proof — there is no amount to pass, and none is passed. This is §3's argument,
+in two signatures.</p>
+
+<h3>A.2 · The two compliance worlds have incompatible signatures</h3>
+<p>The RWA module's compliance hooks, in the same library, expect exactly what the confidential
+side cannot provide. <code>rwa/compliance/modules/mod.rs:166</code>:</p>
+<pre class="light">fn on_transfer(
+    e: &amp;Env,
+    from: AccountSnapshot,
+    to: AccountSnapshot,
+    amount: i128,
+    kind: TransferKind,
+    token: Address,
+);</pre>
+<p>and <code>rwa/compliance/mod.rs:92</code>:</p>
+<pre class="light">pub struct AccountSnapshot {
+    pub address: Address,
+    /// The wallet's total token balance, before the operation.
+    pub balance: i128,
+    /// The partially-frozen portion of `balance`, before the operation.
+    pub frozen: i128,
+}</pre>
+<p>Cleartext amount, cleartext balance, cleartext frozen portion. Every shipped quantitative
+module — <code>compliance-max-balance</code>, <code>compliance-supply-limit</code>,
+<code>compliance-initial-lockup-period</code>, <code>compliance-time-transfers-limits</code> — is
+written against this. None of them can be wired to a confidential token, and the reason is a type
+signature, not an oversight.</p>
+
+<h3>A.3 · Upstream says the identity bridge is missing</h3>
+<p>Issue <strong>#766, "RWA: Confidential support"</strong> — opened 2026-07-06, still
+<strong>open</strong> at the time of writing, milestone <em>Release Candidate v0.9.0</em>:</p>
+<blockquote><p>"Adds confidential-balance support to the RWA token, integrating the confidential
+token module's private balances and transfers with RWA's compliance and identity-verification
+extensions, so regulated tokens can hide transfer amounts while retaining on-chain compliance
+enforcement."</p></blockquote>
+<p>That is the shape of <code>velum-policy</code>, written by the maintainers as future work. We
+also checked the released artifacts: the newest tag at the time of writing
+(<code>v0.8.0-rc.3</code>) contains no cross-reference between the <code>confidential</code> and
+<code>rwa</code> modules in either direction.</p>
+
+<h3>A.4 · The clawback problem, stated and deferred by upstream</h3>
+<p><code>confidential/docs/COMPLIANCE.md:185</code> — why an issuer's ordinary clawback cannot
+reach one holder:</p>
+<blockquote><p>"Once an account deposits into the contract, the underlying SEP-41 ledger lists the
+token contract as the holder of those funds, not the depositor. An issuer's SAC-level
+<code>clawback(token_address, amount)</code> call would drain the pool, debiting unrelated
+accounts."</p></blockquote>
+<p>And <code>COMPLIANCE.md:218</code> — the sentence that defines §11 of this paper. It names both
+the obstacle and, in its last clause, the shape of the remedy <em>(mathematical notation
+simplified from the LaTeX source; wording otherwise verbatim)</em>:</p>
+<blockquote><p>"…where <code>r_s</code> is recovered via the same path the wallet uses for
+checkpoint recovery (<code>DESIGN.md</code> §5.2):
+<code>r_s = Poseidon(δ_spend_r, vk_A, σ_old)</code>. <strong>Because the clawback circuit does not
+have access to <code>vk_A</code></strong>, the spendable-balance side of the proof binds via the
+consistency of <code>b̃_aud,s_old</code> with <code>C_spend</code> at the time of the last
+owner-initiated proof. <strong>The follow-up revision will pin down whether <code>r_s</code> is
+supplied as a private witness with an auxiliary opening proof or derived in-circuit from a
+separately escrowed value.</strong>"</p></blockquote>
+<p>Three things are established by that passage alone. The blinding is a deterministic function of
+<code>vk_A</code> — their equation, not ours. The obstacle is that the circuit lacks
+<code>vk_A</code>. And one of the two candidate remedies they list is <em>a separately escrowed
+value</em>. §11 takes that second option and says what the escrowed value should be:
+<code>vk_A</code> itself.</p>
+
+<h3>A.5 · The predicate circuit is specified, and unimplemented</h3>
+<p><code>confidential/docs/SELECTIVE_DISCLOSURE.md:374</code> specifies the circuit implemented in
+<code>circuits/disclose_balance_ge</code>:</p>
+<blockquote><p>"Two <code>circuit_id</code> shapes are exposed: a <strong>predicate-only</strong>
+form (<code>disclose_balance_ge</code> / <code>disclose_balance_le</code>) that includes DB4 and
+omits U1–U3, where the proof's mere validity asserts the predicate; and a
+<strong>value-revealing</strong> form (<code>disclose_balance_value</code>)…"</p></blockquote>
+<p>The §15.1 circuit inventory lists four disclosure circuits: <code>disclose_recipient</code>,
+<code>disclose_sender</code>, <code>disclose_auditor</code>, <code>disclose_balance</code>. The
+reference implementation distributes two. The provenance check for the other two is recorded at
+the end of this paper.</p>
+
+<h3>A.6 · On-chain verification is named, then excluded</h3>
+<p><code>SELECTIVE_DISCLOSURE.md:542</code>:</p>
+<blockquote><p>"These circuits do <em>not</em> register with the on-chain verifier set
+(DESIGN_cont.md §10). <strong>They are verified entirely off-chain.</strong>"</p></blockquote>
+<p>The exclusion is deliberate, and §14 records what the excluded thing would look like —
+including that the predicate shape is the one it would take:</p>
+<blockquote><p>"…can be added by trivially dropping U1–U3 and exposing <code>v_transfer</code> as a
+public input. <strong>This is also the proof shape an on-chain verifier would consume
+(§5.4).</strong>"</p></blockquote>
+<p>The enum that would have to carry such a circuit confirms the exclusion in code
+(<code>confidential/verifier/mod.rs:100</code>):</p>
+<pre class="light">Register = 0,
+Withdraw = 1,
+Transfer = 2,
+SpenderTransfer = 3,
+SetSpender = 4,
+RevokeSpender = 5,</pre>
+<p>Six transaction circuits, no disclosure variant. <code>velum-attest</code> therefore runs its
+own single-entry registry rather than extending a closed enum.</p>
+
+<h3>A.7 · What this appendix is not</h3>
+<p>It is not a claim that the maintainers were unaware, careless, or slow. The opposite: each gap
+above is documented by them, in their own repository, in the same commits that ship the working
+parts. A specification that names its own open questions is a good specification. Velum's
+contribution is to answer three of those questions with running code — and, where an answer is
+still a proposal (§11's migration), to say so.</p>
+
+<h2 class="sans" style="font-size:11pt">Reproducibility</h2><hr class="rule">
+<pre>noirup --version 1.0.0-beta.11 &amp;&amp; bbup -v 0.87.0
+cd circuits/disclose_balance_ge &amp;&amp; nargo test
+nargo execute witness
+bb write_vk --scheme ultra_honk -b target/disclose_balance_ge.json -o target/
+bb prove    --scheme ultra_honk -b target/disclose_balance_ge.json -w target/witness.gz -o target/
+bb verify   --scheme ultra_honk -k target/vk -p target/proof -i target/public_inputs
+cd ../../contracts &amp;&amp; stellar contract build</pre>
+<p class="muted" style="font-size:8.6pt">Toolchain: <code>stellar-cli ≥ 25.2</code>, Rust with
+<code>wasm32v1-none</code>, soroban-sdk <code>=26.1.0</code>, OpenZeppelin
+<code>stellar-contracts</code> rev <code>539968f</code>. Noir rejects non-ASCII source, comments
+included.</p>
+
+<h2 class="sans" style="font-size:11pt">Provenance of the novelty claim</h2><hr class="rule">
+<p><code>disclose_balance</code>, <code>disclose_balance_ge</code>, <code>disclose_balance_le</code>
+and <code>disclose_auditor</code> appear only in upstream's specification, never in code. Verified
+2026-08-04/05 across: full-text search of three clones; all 16 branches and 10 tags; the complete git
+history (no such file in any commit); commit messages; issues and pull requests (zero matches); and
+authenticated code search across GitHub. On-chain disclosure verification likewise has no public
+implementation — the specification states the circuits do not register with the on-chain verifier
+set, and the <code>CircuitType</code> enum carries no disclosure variant.</p>
+<p>We claim only what that supports: <strong>no public implementation exists in any repository,
+branch, tag or history.</strong> Private work at OpenZeppelin cannot be excluded.</p>
+
+<div class="status">
+<b>Status.</b> Developer-preview software on unaudited primitives. Testnet only, no real value.
+Not an offer or a solicitation; the regulatory mapping is engineering intent, not legal advice.
+</div>
+
+<p class="foot">Velum · Whitepaper draft v0.1 · 2026-08-05 · Every figure in §8 was measured on the
+authors' hardware, not estimated. Source, circuits and contracts accompany this document.</p>
+
+</body>
+</html>
