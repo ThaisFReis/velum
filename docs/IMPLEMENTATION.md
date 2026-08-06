@@ -522,6 +522,19 @@ Demonstrated on the same record, after the balance moved:
 
 Full review: `docs/REVISAO-ARQUITETURA-2026-08-06.md`.
 
+## 6.6 The presentation PDFs went stale, and were rebuilt
+
+Worth recording because it is the failure mode of any artifact that is generated once and then
+diverges. The deck and one-page were built on 2026-08-05, before `velum-seize`, before finding 7
+and before `velum-attest` was redeployed. By 2026-08-06 the deck claimed **66 tests** (69) and
+**five upstream findings** (seven), and both described the clawback work as a circuit that was
+built rather than one verified on-chain. None of it was reachable by grepping the Markdown, because
+the numbers live in the HTML the PDFs are rendered from.
+
+Rebuilt from source and re-checked by extracting the text back out of the finished PDFs: no
+occurrence of `66 test` or `five upstream` survives, layout intact (deck 10 pages, one-page 1).
+The whitepaper PDF is regenerated the same way whenever `docs/WHITEPAPER.md` changes.
+
 ## 7. Toolchain
 
 `nargo 1.0.0-beta.11` · `bb 0.87.0` (CLI, for local circuit work only) · `@aztec/bb.js 0.87.0`
