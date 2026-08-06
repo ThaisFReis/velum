@@ -39,7 +39,7 @@ demo was patched to make this work.
 | `contracts/velum-policy` | Adapter: the token's `Policy` gate → the RWA `IdentityVerifier`. Also **fails closed** on a registry misconfiguration upstream ignores silently (finding 6). |
 | `contracts/velum-attest` | On-chain verifier for position proofs — a component upstream's spec marks *out of scope* (§§5.4, 14). |
 | `circuits/disclose_balance_ge` | The predicate circuit upstream **specifies** (`SELECTIVE_DISCLOSURE.md` §9) **and does not ship**. No public implementation exists in any repository, branch, tag or history — see [provenance](docs/WHITEPAPER.md). |
-| `circuits/seize` | Answers upstream's open question on individual clawback: premise verified, circuit built, partial seizure demonstrated. |
+| `circuits/seize` + `contracts/velum-seize` | Answers upstream's open question on individual clawback: premise verified, circuit built, and a partial seizure **verified on-chain** — bounded by a position the ledger never reveals. |
 | `experiments/` | Two research artifacts: the clawback premise, and a quantitative rule inside upstream's transfer circuit (+3 % cost). |
 | `profiles/cvm175.json` | A jurisdiction as configuration — claim topics, thresholds, issuer controls — annotated with what is actually enforced and what is merely declared. |
 | `scripts/` | The two demos below. |
@@ -55,6 +55,7 @@ RWA/T-REX module, the UltraHonk verifier, and the reference demo's SDK. Study cl
 | Contract | Address |
 |---|---|
 | `velum-attest` | `CDEDFUYUNNQLU4C7ISKXJ26AIPIR42UJPW7XO72EZFEC3Y6VT6OO7LPK` |
+| `velum-seize` | `CDVV37Y766VSLNRRIHRXBTUCEN7UJU7QQVROLWYVA6L7FRTKJO3Z2LE5` |
 | `velum-policy` | `CDJET5BV36RDRNCNCNXJFYWUKPCX4VWXTUY4EGU4W5VUJ3FHLHIYFPKV` |
 | identity-gated confidential token | `CBDT4EKUF66MS7HHDHMLDPDI7TOPZCV7AYYLC53ES7TEB67KAT3BFWV5` |
 
@@ -64,6 +65,10 @@ Two transactions worth opening:
   A contract read the holder's commitment and viewing key from the token, the threshold from its own
   profile, verified an UltraHonk proof, and recorded that the position clears 500 000 — without the
   amount appearing anywhere.
+- **A seizure proved on-chain** — [`282a2947…8c4cd`](https://stellar.expert/explorer/testnet/tx/282a2947b2998b2b2de56c9727d0a151d8aa0a9f8e55d10014e915309be8c4cd).
+  An authority proved a seizure of 250 000 fits inside a confidential position, against commitments
+  read live from the token. The ledger records the amount seized and never the position. No value
+  moves and the key escrow is simulated — the caveats are in the contract's own module docs.
 - **A wallet accepted by identity** — [`d9a1a33c…b78fd7`](https://stellar.expert/explorer/testnet/tx/d9a1a33cdadebd9f440c958a5557e29c7e030ad411e84335cb0307da1ab78fd7).
   The wallet without a claim gets `#3602 NotAuthorizedByPolicy` instead.
 
@@ -106,6 +111,10 @@ VELUM_ATTEST=CDEDFUYUNNQLU4C7ISKXJ26AIPIR42UJPW7XO72EZFEC3Y6VT6OO7LPK \
 # identity gating: one wallet with a claim, one without
 VELUM_TOKEN=CBDT4EKUF66MS7HHDHMLDPDI7TOPZCV7AYYLC53ES7TEB67KAT3BFWV5 \
   pnpm exec tsx ../../../../scripts/demo-gate.ts
+
+# a partial seizure proved against a position that stays unreadable
+VELUM_SEIZE=CDVV37Y766VSLNRRIHRXBTUCEN7UJU7QQVROLWYVA6L7FRTKJO3Z2LE5 \
+  pnpm exec tsx ../../../../scripts/demo-seize.ts
 ```
 
 > Run `demo-attest.ts` without `VELUM_ATTEST` and it prints the verification key needed to deploy
@@ -140,8 +149,10 @@ Six, each with reproduction. Three are documentation or tooling; three are behav
 
 - **Not production.** Developer-preview primitives; the UltraHonk verifier is unaudited. Testnet
   only, no real value.
-- **Not finished.** The clawback migration — a register-circuit change and re-registration — is
-  designed and priced, not built.
+- **Not finished.** The clawback circuit verifies on-chain, but **no value moves** — executing a
+  seizure needs an entry point inside the token contract, which we did not fork — and the key
+  escrow it presumes (a register-circuit change plus re-registration) is designed and priced, not
+  built. The on-chain demo simulates the escrow with a test account's keys.
 - **Not solved.** Predicates over **encrypted aggregates across accounts** (concentration by
   tranche, subordination ratio between senior and subordinated) remain open, as far as we can
   determine on any chain.

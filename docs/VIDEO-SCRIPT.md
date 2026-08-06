@@ -13,6 +13,7 @@ Nethermind. Se preferirem narrar em PT-BR, o roteiro funciona igual; só troquem
 |---|---|---|
 | `demo-attest.ts` | **3m39s** | confirmação de transação em testnet (register, deposit, merge, attest) |
 | `demo-gate.ts` | **1m55s** | idem |
+| `demo-seize.ts` | ~3m | idem (opcional — só se sobrar tempo na cena 5) |
 | *a prova em si* | **2,06s** | é a parte rápida |
 
 Ou seja: **grave cada demo separadamente e acelere a espera na edição** (3–4× nos trechos de
@@ -139,7 +140,8 @@ is_attested = true
 > witness or derived from a separately escrowed value.'*
 >
 > They name the obstacle and list the remedy. We took the second option, said what to escrow, and
-> verified it in code — premise and circuit both.
+> verified it in code — premise, circuit, and the circuit running on-chain: an authority proving a
+> partial seizure fits inside a position it cannot read.
 >
 > Along the way we found six defects in their material. One of them matters: a claim topic with no
 > trusted issuer is skipped in silence, so an operator who tightens the rules and forgets the
@@ -152,7 +154,8 @@ is_attested = true
 **Tela:** slide 9 (limites), depois o repositório.
 
 > "What we are not claiming. This is developer-preview cryptography — the verifier is unaudited,
-> testnet only. The clawback migration is designed and priced, not built. And predicates over
+> testnet only. The seizure verifies, but no value moves — that needs an entry point inside the
+> token — and the key escrow behind it is designed and priced, not built. And predicates over
 > encrypted aggregates across accounts remain open, as far as we can tell, on any chain.
 >
 > Everything is MIT, on GitHub, with every address and hash in the implementation record.

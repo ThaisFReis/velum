@@ -366,8 +366,9 @@ reusable and the regulation is the configuration.
 We did not implement the migration this requires; §11.6 prices it. Everything short of it,
 however, is **implemented and proven**: the cryptographic premise is verified against the
 unmodified upstream circuit library (`experiments/clawback-poc`, 9/9 tests), and the seize
-circuit itself is built, tested and proven under UltraHonk (`circuits/seize` — 11/11 tests,
-93 ACIR opcodes, proof in 0.33 s, verified; an `alpha` above the balance is not even
+circuit itself is built, tested and **verified on-chain** (`circuits/seize` — 12/12 tests,
+93 ACIR opcodes; `velum-seize` on testnet verified a seizure bounded by a live confidential
+position without the position being readable, and an `alpha` above the balance is not even
 witnessable). The note is included because it answers a question upstream left open, and
 because the answer turns out to be short.
 
@@ -476,6 +477,13 @@ target's on-chain viewing key, so a proof built for one account cannot be applie
 Z6/Z7 force the post-seizure commitment and checkpoint to match `remaining` under the canonical
 derivations, so the authority can neither short-change the holder nor desynchronize its wallet.
 At 93 ACIR opcodes it is cheaper than the transfer circuit itself.
+
+It also verifies on-chain. `contracts/velum-seize` reads `PVK_A`, `C_spend` and `C_receive` from
+the token, assembles the eleven public inputs and verifies the proof — so a seizure is settled
+against state the authority cannot substitute. Two limits are worth stating in the same breath:
+no value moves, because rewriting the commitments needs a `seize` entry point inside the token
+that we did not fork; and the escrow below is simulated with a test account's keys. What is
+established is that the verification half works on-chain, which was the half in doubt.
 
 The *receiving* side closes as well. `C_receive` accumulates two kinds of contribution:
 confidential transfers, whose per-transfer openings the auditor already recovers from its

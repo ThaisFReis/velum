@@ -15,6 +15,7 @@ Last run: **2026-08-05**. Network: **Stellar testnet**.
 |---|---|---|
 | `velum-attest` | `CDEDFUYUNNQLU4C7ISKXJ26AIPIR42UJPW7XO72EZFEC3Y6VT6OO7LPK` | 36 937 B wasm. Constructor: owner, token, `addr_f`, VK, threshold=500 000 |
 | `velum-policy` | `CDJET5BV36RDRNCNCNXJFYWUKPCX4VWXTUY4EGU4W5VUJ3FHLHIYFPKV` | 8 101 B wasm. Delegates to the identity verifier, and fails closed on an issuer-less topic (§6.3). The gated token points here |
+| `velum-seize` | `CDVV37Y766VSLNRRIHRXBTUCEN7UJU7QQVROLWYVA6L7FRTKJO3Z2LE5` | 35 636 B wasm. Constructor: owner, token, VK. Verifies the seize circuit against live token state (§2.2) |
 | `velum-policy` (v1, superseded) | `CCCQ7Z6FYLCIXHBQDSIUJ46YMS63VDHY3ZM5ISGWGFJ5EXONOWOXQXDK` | 7 808 B. Kept deployed as the control in the A/B below |
 | identity-gated token | `CBDT4EKUF66MS7HHDHMLDPDI7TOPZCV7AYYLC53ES7TEB67KAT3BFWV5` | Confidential token deployed through upstream's factory, bound to `velum-policy`, `sac_passthrough: true` |
 
@@ -173,12 +174,59 @@ gate appear to reject an authorized wallet. Fixed: the script probes with `regis
 account is new and with a policy-gated `deposit` when it is not, and it names the actual error
 code in every branch.
 
+## 2.2 A seizure proved on-chain, bounded by a position nobody can read
+
+The clawback design note (whitepaper §11) was, until this run, a premise plus a circuit that
+verified locally. `velum-seize` moves the verification on-chain: it reads the target's live
+`PVK_A`, `C_spend` and `C_receive` cross-contract from the token, assembles the 11 public field
+elements (352 B) in the circuit's order, and verifies the UltraHonk proof.
+
+```
+[1/3] a holder with a real position
+  GAH2Q6MEHRUI7S6WXBUORQJQFXJQ75FFX37LLXVR7DHWMAWUHFB2PG3W
+  position is a commitment on-chain; the amount is not readable
+
+[2/3] the authority proves a seizure of 250000 is bounded by that position
+  proof: 14592 B in 2.06s
+  ✅ seizure proven on-chain — tx 282a2947b2998b2b2de56c9727d0a151d8aa0a9f8e55d10014e915309be8c4cd
+     the ledger records the amount seized. It never records the position.
+
+[3/3] the same authority claiming more than the position holds
+  ✅ refused: Z4 bounds alpha by the position, so the witness cannot be built.
+```
+
+The holder deposited 1 000 000 and the authority proved a seizure of 250 000. Nothing on the
+ledger states the position — only that a seizure of that size fits inside it. The over-large
+attempt fails where every unprovable claim in this project fails: at witness construction, before
+a proof exists.
+
+`verify_seizure` is owner-gated, unlike `attest_position`. A position attestation is
+self-authenticating and harmless to relay; a seizure is an assertion *about* someone, so the gate
+records who made it. The demo therefore signs with the contract owner, not the holder.
+
+### What this does not show, stated before anyone asks
+
+1. **No value moves.** Rewriting the token's commitments requires a `seize` entry point inside the
+   token contract. We did not fork it. What ran here is the verification half — the half that was
+   in doubt.
+2. **The escrow is simulated.** The circuit takes the holder's `vk` as a private witness. For an
+   authority to hold it *without the holder's cooperation* — the entire point of a clawback —
+   registration must escrow it (whitepaper §11.3), a breaking change to upstream's register circuit
+   that we did not make. Here the script holds `vk` because it created the account.
+
+So the claim is bounded to exactly this: **the seize circuit verifies on-chain against state the
+prover does not control, and an over-large seizure cannot be proven.** Not that a
+non-cooperating holder can be seized from today. `contracts/velum-seize/src/lib.rs` says the same
+thing in its module docs, so the caveat cannot be lost by reading the code instead of this file.
+
+---
+
 ## 3. Circuits
 
 | Package | Tests | Cost | Proof |
 |---|---|---|---|
 | `circuits/disclose_balance_ge` | 11 ✅ | — | 14 592 B · 6 public inputs · 0.25 s (CLI) / 3.81 s (bb.js, in-process) |
-| `circuits/seize` | 12 ✅ | 93 ACIR opcodes | 14 592 B · 0.33 s · verified |
+| `circuits/seize` | 12 ✅ | 93 ACIR opcodes | 14 592 B · 0.33 s (CLI) / 2.06 s (bb.js) · **verified on-chain** (§2.2) |
 | `experiments/clawback-poc` | 9 ✅ | — | premise verification, no circuit |
 | `experiments/circuit-cap-poc` | 34 ✅ | 133 → 137 opcodes (+3 %) | patch against upstream's transfer circuit |
 
@@ -211,6 +259,17 @@ prover-supplied, so the trust boundary holds.
 
 No authorization is required to submit an attestation: D1/D2 bind the proof to the account's own
 viewing key, so relaying a valid proof only records a fact that account could have recorded itself.
+
+**`velum-seize`** — verifies the seize circuit (Z1–Z7) against the token's live account record and
+stores `SeizeVerdict { amount, sigma_new, verified_at_ledger }`. Like `velum-attest` it runs a
+one-entry VK registry of its own, for the same reason: `CircuitType` is upstream's closed enum for
+the token's own circuits and has no seize variant, so the variant name is just a storage slot.
+
+There is no `addr_f` among its public inputs and none is needed. `PVK_A = vk · H` with
+`vk = Poseidon2(δ_vk, sk, addr_f)` is already contract-bound, so a proof built against one token's
+account cannot verify against another's. The three state inputs are read from the token rather than
+supplied by the prover, which is what makes the verdict mean anything: the authority chooses
+`alpha` and `sigma_new`, and the chain supplies everything it could otherwise lie about.
 
 ---
 
@@ -335,6 +394,7 @@ Measured end to end on testnet, because it changes how the demo can be presented
 |---|---|---|
 | `demo-attest.ts` | **3 m 39 s** | transaction confirmation — register, deposit, merge, attest |
 | `demo-gate.ts` | **1 m 55 s** | same |
+| `demo-seize.ts` | not separately timed | dominated by the same register → deposit → merge sequence |
 | the proof itself | **2.06 s** | the fast part |
 
 Proving is not the bottleneck; testnet confirmation is. A three-minute video cannot run both live,
@@ -354,16 +414,19 @@ Reproduction steps: `circuits/README.md` for the circuits, and for the on-chain 
 ```bash
 cd refs/ct-demo/packages/sdk
 VELUM_ATTEST=<contract-id> pnpm exec tsx ../../../../scripts/demo-attest.ts
+VELUM_SEIZE=<contract-id>  pnpm exec tsx ../../../../scripts/demo-seize.ts
 ```
 
-Run without `VELUM_ATTEST` to print the verification key needed to deploy `velum-attest`.
+Run either without its variable to print the verification key needed to deploy that contract.
+**Derive the key from the same prover that will generate the proofs** — see §5.2.
 
 ---
 
 ## 8. What is not done
 
 - The clawback migration (register-circuit escrow, new VK, re-registration) is designed and
-  priced in the whitepaper §11.6, not built.
+  priced in the whitepaper §11.6, not built. The seize circuit verifies on-chain (§2.2), but no
+  value moves and the escrow is simulated with a test account's keys.
 - Aggregates across accounts — concentration by tranche, subordination ratio — remain open.
 
 Testnet only. The UltraHonk verifier is developer preview and unaudited.
