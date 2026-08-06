@@ -182,17 +182,39 @@ We implement the `ge` predicate to that specification:
 |---|---|---|
 | D1 | `vk_A = Poseidon2(δ_vk, sk_A, addr_f)` | contract-bound viewing key |
 | D2 | `PVK_A = vk_A · H` | binds the proof to the on-chain account record |
-| DB3 | `C_spend = v_s·G + r_s·H` | opening of the current balance; by Pedersen binding the witnessed `v_s` *is* the balance |
+| DB3 | `C_spend = v_s·G + r_s·H` | opening of the spendable balance; by Pedersen binding the witnessed `v_s` *is* that balance |
 | D5 | `v_s ∈ [0, 2^127)` | prevents a wrapped-negative `v_s` satisfying DB4 |
 | DB4 | `v_s ≥ v_threshold` | the predicate, as a non-negative difference |
 
-We add one constraint beyond the specification:
+…and add two constraints beyond it:
 
 | DB4b | `v_threshold ∈ [0, 2^127)` | a threshold near the field modulus would make DB4 vacuous by wrap-around |
+| DB3b | `C_receive = v_r·G + r_r·H`, and DB4 bounds `v_s + v_r` | makes the predicate one about the **position**, not just the spendable part |
 
 `v_threshold` is contract-supplied rather than prover-supplied, so DB4b is defence in depth
 rather than a soundness necessity — but it makes the circuit's guarantee independent of how
 carefully a deployment populates its profile, at negligible cost.
+
+DB3b is a different matter, and it is the one place where we think the specification is wrong.
+§9's verifier flow resolves exactly two pieces of account state: `PVK_A` and `C_spend`. A
+confidential account has *three* value-bearing fields, and `C_receive` — where incoming transfers
+accumulate until the holder rolls them over — is not among them. The predicate is therefore about
+the spendable balance, not the position.
+
+For the `ge` shape that is sound but slack. Spendable ≤ position, so `spendable ≥ T` implies
+`position ≥ T`; the circuit can only under-claim. The cost is a false negative: a holder with
+400 000 spendable and 200 000 received-but-not-merged holds 600 000 and cannot prove they clear
+500 000.
+
+For the `le` shape — which the same sentence of the specification names — the identical omission
+inverts from slack to unsound. A concentration ceiling is exactly the regulatory rule one would
+build from `disclose_balance_le`, and a holder subject to it can park value in `C_receive` and
+prove compliance while holding more than the cap. Nothing in the specification flags this, and
+the two variants are introduced as though they were mirror images of one another. They are not:
+the omission is conservative in one direction and load-bearing in the other.
+
+We reported this upstream (finding 7) and closed it here by binding both commitments, which is
+what our own `seize` circuit already had to do. It costs 43 → 67 ACIR opcodes.
 
 ### 4.3 `velum-attest` — verification on-chain
 

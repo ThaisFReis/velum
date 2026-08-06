@@ -143,9 +143,12 @@ async function main(): Promise<void> {
   // ---------------------------------------------------------------- attest
   const ap = attestProver();
   const proofH1 = (await ap.prove({
-    sk: hex(h1.keys.sk), v_s: hex(s1.vS), r_s: hex(s1.rS), addr_f: hex(addrF),
+    sk: hex(h1.keys.sk), v_s: hex(s1.vS), r_s: hex(s1.rS),
+    v_r: hex(s1.vR), r_r: hex(s1.rR), addr_f: hex(addrF),
     pvk_a_x: hex(s1.pvk.x), pvk_a_y: hex(s1.pvk.y),
-    c_spend_x: hex(s1.cSpend.x), c_spend_y: hex(s1.cSpend.y), v_threshold: hex(THRESHOLD),
+    c_spend_x: hex(s1.cSpend.x), c_spend_y: hex(s1.cSpend.y),
+    c_receive_x: hex(s1.cReceive.x), c_receive_y: hex(s1.cReceive.y),
+    v_threshold: hex(THRESHOLD),
   })).proof;
   const doAttest = (who: string, proof: Uint8Array) =>
     client.invoke(attest, "attest_position", [
@@ -165,8 +168,11 @@ async function main(): Promise<void> {
   await mustFail("S3", "replaying the pre-move proof — would let a stale claim stand as current",
     () => doAttest(h1.kp.publicKey(), proofH1));
 
-  const att: any = await client.simulate(attest, "attestation", [new Address(h1.kp.publicKey()).toScVal()]);
-  console.log(`  ℹ️  the S1 attestation is still on record after the move (ledger-stamped, not expiring)`);
+  const fresh = async (age: number) => xdr.ScVal.fromXDR((await client.simulate(
+    attest, "is_attested", [new Address(h1.kp.publicKey()).toScVal(), xdr.ScVal.scvU32(age)],
+  )).toXDR()).value();
+  console.log(`  ℹ️  the S1 record survives the move, but the window is the caller's:`);
+  console.log(`       is_attested(max_age=1000) = ${await fresh(1000)}   is_attested(max_age=0) = ${await fresh(0)}`);
 
   // ---------------------------------------------------------------- seize
   const sp = seizeProver();

@@ -8,13 +8,23 @@ global SK: Field = 0x1f2e3d4c5b6a79887766554433221100;
 global ADDR_F: Field = 0x2b7c1e5a0f3d94682c5e8a1b4d7f0396;
 global V_S: Field = 1_000_000; // holder's spendable balance
 global R_S: Field = 0x0a1b2c3d4e5f60718293a4b5c6d7e8f9;
+global R_R: Field = 0x0f1e2d3c4b5a69788796a5b4c3d2e1f0;
 
-/// Drives `main` with a self-consistent fixture and the given threshold.
-fn run(v_s: Field, r_s: Field, v_threshold: Field) {
+/// Drives `main` with a self-consistent fixture over the whole position.
+fn run_split(v_s: Field, r_s: Field, v_r: Field, r_r: Field, v_threshold: Field) {
     let vk = vk_from_sk(SK, ADDR_F);
     let pvk = scalar_mul(vk, H);
     let c_spend = commit(v_s, r_s);
-    main(SK, v_s, r_s, ADDR_F, pvk.x, pvk.y, c_spend.x, c_spend.y, v_threshold);
+    let c_receive = commit(v_r, r_r);
+    main(
+        SK, v_s, r_s, v_r, r_r, ADDR_F, pvk.x, pvk.y,
+        c_spend.x, c_spend.y, c_receive.x, c_receive.y, v_threshold,
+    );
+}
+
+/// The common case: nothing pending on the receiving side.
+fn run(v_s: Field, r_s: Field, v_threshold: Field) {
+    run_split(v_s, r_s, 0, R_R, v_threshold);
 }
 
 // ---------- the predicate holds ----------
@@ -61,7 +71,8 @@ fn rejects_wrong_commitment_opening() {
     let vk = vk_from_sk(SK, ADDR_F);
     let pvk = scalar_mul(vk, H);
     let c_spend = commit(V_S, R_S); // commitment to the REAL balance
-    main(SK, 9_000_000, R_S, ADDR_F, pvk.x, pvk.y, c_spend.x, c_spend.y, 5_000_000);
+    let cr = commit(0, R_R);
+    main(SK, 9_000_000, R_S, 0, R_R, ADDR_F, pvk.x, pvk.y, c_spend.x, c_spend.y, cr.x, cr.y, 5_000_000);
 }
 
 #[test(should_fail)]
@@ -71,7 +82,8 @@ fn rejects_wrong_secret_key() {
     let vk = vk_from_sk(SK, ADDR_F);
     let pvk = scalar_mul(vk, H);
     let c_spend = commit(V_S, R_S);
-    main(SK + 1, V_S, R_S, ADDR_F, pvk.x, pvk.y, c_spend.x, c_spend.y, 500_000);
+    let cr = commit(0, R_R);
+    main(SK + 1, V_S, R_S, 0, R_R, ADDR_F, pvk.x, pvk.y, c_spend.x, c_spend.y, cr.x, cr.y, 500_000);
 }
 
 #[test(should_fail)]
@@ -81,7 +93,8 @@ fn rejects_proof_replayed_on_another_token() {
     let vk = vk_from_sk(SK, ADDR_F);
     let pvk = scalar_mul(vk, H);
     let c_spend = commit(V_S, R_S);
-    main(SK, V_S, R_S, ADDR_F + 1, pvk.x, pvk.y, c_spend.x, c_spend.y, 500_000);
+    let cr = commit(0, R_R);
+    main(SK, V_S, R_S, 0, R_R, ADDR_F + 1, pvk.x, pvk.y, c_spend.x, c_spend.y, cr.x, cr.y, 500_000);
 }
 
 #[test(should_fail)]
@@ -91,7 +104,8 @@ fn rejects_stale_commitment() {
     let vk = vk_from_sk(SK, ADDR_F);
     let pvk = scalar_mul(vk, H);
     let c_stale = commit(V_S + 1, R_S); // chain now holds a different commitment
-    main(SK, V_S, R_S, ADDR_F, pvk.x, pvk.y, c_stale.x, c_stale.y, 500_000);
+    let cr = commit(0, R_R);
+    main(SK, V_S, R_S, 0, R_R, ADDR_F, pvk.x, pvk.y, c_stale.x, c_stale.y, cr.x, cr.y, 500_000);
 }
 
 // ---------- soundness of the defensive constraint ----------
@@ -109,7 +123,11 @@ fn print_fixture_public_inputs() {
     let vk = vk_from_sk(SK, ADDR_F);
     let pvk = scalar_mul(vk, H);
     let c = commit(V_S, R_S);
+    let cr = commit(0, R_R);
     let (px, py, cx, cy) = (pvk.x, pvk.y, c.x, c.y);
+    let (rx, ry) = (cr.x, cr.y);
+    println(f"c_receive_x = {rx}");
+    println(f"c_receive_y = {ry}");
     println(f"pvk_a_x = {px}");
     println(f"pvk_a_y = {py}");
     println(f"c_spend_x = {cx}");
@@ -118,21 +136,32 @@ fn print_fixture_public_inputs() {
 
 // ---------- the scope of the claim, made executable ----------
 
+#[test]
+fn accepts_a_position_split_across_spendable_and_receiving() {
+    // 400_000 spendable + 200_000 received but not yet rolled over is a position of
+    // 600_000, and it clears 500_000. Binding only C_spend -- which is what
+    // SELECTIVE_DISCLOSURE.md section 9 resolves -- would refuse this holder, and would
+    // let the mirrored ceiling variant be evaded by parking value in C_receive. DB3b
+    // closes both.
+    run_split(400_000, R_S, 200_000, R_R, 500_000);
+}
+
 #[test(should_fail)]
-fn documents_that_only_the_spendable_balance_is_in_scope() {
-    // A holder whose position is split -- 400_000 spendable, 200_000 received but not yet
-    // rolled over -- holds 600_000 and cannot prove they clear 500_000. There is no
-    // c_receive among this circuit's public inputs, so the predicate is over the SPENDABLE
-    // balance, not over the position.
-    //
-    // For a floor this is sound and merely conservative: spendable <= position, so proving
-    // spendable >= T implies position >= T. It never over-claims; it can only under-claim,
-    // as here.
-    //
-    // Inverting DB4 to build a CEILING would flip that safety into a hole: a holder could
-    // park value in c_receive and prove they are under a concentration cap while holding
-    // more than it. A `disclose_balance_le` must therefore be modelled on `circuits/seize`
-    // -- which opens BOTH commitments (Z2, Z3) and bounds their sum (Z4) -- and not on this
-    // circuit with the comparison reversed.
-    run(400_000, R_S, 500_000);
+fn rejects_a_position_still_short_once_both_sides_are_counted() {
+    // The sum is what is bounded: 300_000 + 100_000 < 500_000.
+    run_split(300_000, R_S, 100_000, R_R, 500_000);
+}
+
+#[test(should_fail)]
+fn rejects_an_unopenable_receiving_balance() {
+    // DB3b is a real opening, not a declaration: a holder cannot inflate the position
+    // by claiming a v_r whose commitment they cannot produce.
+    let vk = vk_from_sk(SK, ADDR_F);
+    let pvk = scalar_mul(vk, H);
+    let c_spend = commit(400_000, R_S);
+    let c_receive = commit(200_000, R_R);
+    main(
+        SK, 400_000, R_S, 900_000, R_R, ADDR_F, pvk.x, pvk.y,
+        c_spend.x, c_spend.y, c_receive.x, c_receive.y, 500_000,
+    );
 }

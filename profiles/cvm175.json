@@ -45,7 +45,7 @@
       "unit": "underlying asset base units",
       "circuit": "disclose_balance_ge",
       "enforced": false,
-      "comment": "The holder proves position >= this value and a contract records it. Note the distinction: this is ATTESTABLE, not enforced — nothing compels a holder to attest, and no operation is blocked for lack of an attestation. A consumer (transfer agent, distributor, another contract) decides what to require. Enforcing it inside the transfer would need the quantitative rule in the circuit itself — see experiments/circuit-cap-poc. Also note this is the ticket floor, not the CVM net-worth test for investidor qualificado, which is an identity claim (topic 2) attested off-chain.",
+      "comment": "The holder proves position >= this value and a contract records it. The proof covers BOTH commitments (spendable and receiving), so it is about the position and not merely the spendable part. Note the distinction: this is ATTESTABLE, not enforced — nothing compels a holder to attest, and no operation is blocked for lack of an attestation. A consumer (transfer agent, distributor, another contract) decides what to require. Enforcing it inside the transfer would need the quantitative rule in the circuit itself — see experiments/circuit-cap-poc. Also note this is the ticket floor, not the CVM net-worth test for investidor qualificado, which is an identity claim (topic 2) attested off-chain.",
       "attestable": true,
       "verified_on_testnet": true
     },
@@ -96,7 +96,7 @@
       "claim_topics_and_issuers": "CB7ODYCJLLCWHMCYSZ6IUT3OQEQ5KEGX2OXNM3I2CIMI3IQ3QOTB226N",
       "identity_verifier": "CBZS626ZJMLC2ILCJCV4RLSLR7MZYBDEV7DNAEY5CZRKUFQQUPVH5M22",
       "velum_policy": "CDJET5BV36RDRNCNCNXJFYWUKPCX4VWXTUY4EGU4W5VUJ3FHLHIYFPKV",
-      "velum_attest": "CDEDFUYUNNQLU4C7ISKXJ26AIPIR42UJPW7XO72EZFEC3Y6VT6OO7LPK",
+      "velum_attest": "CBCBSILY5B562Q263W4EDYU7IHBV3SSM3IFWA333MII3OK3QRGNCDXKY",
       "gated_token": "CBDT4EKUF66MS7HHDHMLDPDI7TOPZCV7AYYLC53ES7TEB67KAT3BFWV5"
     }
   }

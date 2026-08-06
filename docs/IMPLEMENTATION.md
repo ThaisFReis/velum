@@ -13,7 +13,8 @@ Last run: **2026-08-05**. Network: **Stellar testnet**.
 
 | Contract | Address | Notes |
 |---|---|---|
-| `velum-attest` | `CDEDFUYUNNQLU4C7ISKXJ26AIPIR42UJPW7XO72EZFEC3Y6VT6OO7LPK` | 36 937 B wasm. Constructor: owner, token, `addr_f`, VK, threshold=500 000 |
+| `velum-attest` | `CBCBSILY5B562Q263W4EDYU7IHBV3SSM3IFWA333MII3OK3QRGNCDXKY` | 37 933 B wasm. Constructor: owner, token, `addr_f`, VK, threshold=500 000. Binds `C_receive` too (finding 7) and `is_attested` takes a freshness window |
+| `velum-attest` (v1, superseded) | `CDEDFUYUNNQLU4C7ISKXJ26AIPIR42UJPW7XO72EZFEC3Y6VT6OO7LPK` | 36 937 B. Spendable-only predicate, non-expiring `is_attested` |
 | `velum-policy` | `CDJET5BV36RDRNCNCNXJFYWUKPCX4VWXTUY4EGU4W5VUJ3FHLHIYFPKV` | 8 101 B wasm. Delegates to the identity verifier, and fails closed on an issuer-less topic (§6.3). The gated token points here |
 | `velum-seize` | `CDVV37Y766VSLNRRIHRXBTUCEN7UJU7QQVROLWYVA6L7FRTKJO3Z2LE5` | 35 636 B wasm. Constructor: owner, token, VK. Verifies the seize circuit against live token state (§2.2) |
 | `velum-policy` (v1, superseded) | `CCCQ7Z6FYLCIXHBQDSIUJ46YMS63VDHY3ZM5ISGWGFJ5EXONOWOXQXDK` | 7 808 B. Kept deployed as the control in the A/B below |
@@ -63,10 +64,11 @@ XDR-JSON payload in §6, finding 4 — the format documented upstream cannot wor
     C_spend.x = 0x1c37cfd2395d01244935ca8eef123da331b2a55b4b86f600b43262373b50e429
 
 [3/4] prove position >= threshold, then verify ON-CHAIN
-  proof: 14592 B in 3.81s
-  ✅ attested on-chain — tx f8ff29…3267
-     https://stellar.expert/explorer/testnet/tx/f8ff2951ad2277d4337b590842762a60ee46b8936d9c9014f5154a0918c13267
-  is_attested = true
+  proof: 14592 B in 2.68s
+  ✅ attested on-chain — tx f6c02c…13da
+     https://stellar.expert/explorer/testnet/tx/f6c02ceb6dde8abe6b1a1b0ccd4c8bc265098c5c7564d78520870031241213da
+  is_attested(max_age=1000 ledgers) = true
+  is_attested(max_age=0)         = true  ← same record, stricter window
      the contract learned the position clears 500000 — and nothing else.
 
 [4/4] the same holder claiming a threshold above their position
@@ -88,14 +90,15 @@ to submit and nothing for the verifier to reject.
 
 ### Public inputs the contract reassembles
 
-192 bytes, six field elements, in circuit order. From the run above:
+256 bytes, eight field elements, in circuit order:
 
 | # | Field | Source at verification time |
 |---|---|---|
 | 0 | `22c4a8e4…1fa8` | `addr_f`, pinned at construction |
-| 1–2 | `1fe490fe…9d02` / `1a1f7369…c1e1` | `PVK_A`, read from the token |
-| 3–4 | `1c37cfd2…e429` / `20c1afb4…1cdd` | `C_spend`, read from the token |
-| 5 | `…0007a120` | threshold (500 000), the contract's own profile |
+| 1–2 | `PVK_A.x` / `.y` | read from the token |
+| 3–4 | `C_spend.x` / `.y` | read from the token |
+| 5–6 | `C_receive.x` / `.y` | read from the token — **not** in upstream's §9 flow; see §6, finding 7 |
+| 7 | `…0007a120` | threshold (500 000), the contract's own profile |
 
 The prover supplies only the proof. A caller substituting its own commitment would verify
 against a blob the contract never assembles.
@@ -269,12 +272,12 @@ authority does not get to pick the number after proving.
 
 | Package | Tests | Cost | Proof |
 |---|---|---|---|
-| `circuits/disclose_balance_ge` | 12 ✅ | — | 14 592 B · 6 public inputs · 0.25 s (CLI) / 3.81 s (bb.js, in-process) |
+| `circuits/disclose_balance_ge` | 14 ✅ | 43 → **67** ACIR opcodes (DB3b) | 14 592 B · 8 public inputs · 2.68 s (bb.js, in-process) |
 | `circuits/seize` | 12 ✅ | 93 ACIR opcodes | 14 592 B · 0.33 s (CLI) / 2.06 s (bb.js) · **verified on-chain** (§2.2) |
 | `experiments/clawback-poc` | 9 ✅ | — | premise verification, no circuit |
 | `experiments/circuit-cap-poc` | 34 ✅ | 133 → 137 opcodes (+3 %) | patch against upstream's transfer circuit |
 
-**67 tests, all passing.**
+**69 tests, all passing.**
 
 The 34 in `circuit-cap-poc` are not a package — they are two patches against upstream's transfer
 circuit. Re-applied and re-run in this review: 34 pass and `nargo info` reports 137 ACIR opcodes,
@@ -282,8 +285,9 @@ exactly the published figures (133 → 137, +3 %). Reproduction is in
 `experiments/circuit-cap-poc/README.md`.
 
 `disclose_balance_ge` implements `SELECTIVE_DISCLOSURE.md` §9 (constraints D1, D2, DB3, D5, DB4),
-plus one constraint beyond the spec: DB4b range-checks the threshold, so a malformed public input
-cannot make the predicate vacuous.
+plus two constraints beyond the spec: DB4b range-checks the threshold, so a malformed public input
+cannot make the predicate vacuous; and DB3b opens `C_receive` and bounds `v_s + v_r`, so the
+predicate is about the position rather than the spendable balance (§6, finding 7).
 
 `seize` (Z1–Z7) answers upstream's open question on individual clawback: it opens both
 commitments, bounds `alpha <= v_s + v_r`, and writes the post-seizure state under the protocol's
@@ -389,6 +393,18 @@ Five, all with reproduction.
 
 ---
 
+7. **`SELECTIVE_DISCLOSURE.md` §9 resolves only `PVK_A` and `C_spend`, which makes the specified
+   `disclose_balance_le` evadable.** A confidential account carries value in two commitments, and
+   `C_receive` — where incoming transfers sit until the holder rolls them over — is not among the
+   state §9's verifier flow reads. For the `ge` shape the omission is sound but slack: spendable ≤
+   position, so the predicate can only under-claim (a holder with 400 000 spendable and 200 000
+   unmerged holds 600 000 and cannot prove clearing 500 000). For the `le` shape, named in the same
+   sentence as though it were a mirror image, the same omission is load-bearing: a concentration
+   ceiling is the natural rule to build from it, and a holder can park value in `C_receive` and
+   prove compliance while exceeding the cap. Closed here by DB3b, binding both commitments and
+   bounding their sum — which `circuits/seize` already had to do. Cost: 43 → 67 ACIR opcodes,
+   proving 2.06 s → 2.68 s.
+
 ## 6.1 Regulatory profile
 
 `profiles/cvm175.json` expresses the jurisdiction as configuration. Audited against what is
@@ -450,30 +466,39 @@ Proving is not the bottleneck; testnet confirmation is. A three-minute video can
 so `docs/VIDEO-SCRIPT.md` records each separately and speeds up the waiting visibly rather than
 cutting it — the honest edit, not the flattering one.
 
-## 6.5 Two architectural findings from the review
+## 6.5 Two architectural findings from the review, and their fixes
 
-Neither is a defect in what is deployed; both would become one on the next step.
+Neither was a defect in what was deployed. Both were fixed the same day; `velum-attest` was
+redeployed and the nine probes re-run against the new contract, 9/9.
 
-**`disclose_balance_ge` proves over the *spendable* balance, not the position.** Its public inputs
-are `addr_f`, `PVK_A`, `C_spend` and the threshold — there is no `C_receive`. For a **floor** this
-is sound and merely conservative: spendable ≤ position, so proving spendable ≥ T implies
-position ≥ T; it can only under-claim (a holder with 400 000 spendable and 200 000 received but
-not yet rolled over cannot attest clearing 500 000). Inverting DB4 to build a **ceiling** flips
-that safety into a hole — a holder parks value in `C_receive` and proves they are under a
-concentration cap while holding more than it. That inversion is exactly how the roadmap describes
-`disclose_balance_le`. It must instead be modelled on `circuits/seize`, which opens both
-commitments (Z2, Z3) and bounds their sum (Z4). Recorded as an executable test:
-`documents_that_only_the_spendable_balance_is_in_scope`.
+**`disclose_balance_ge` proved over the *spendable* balance, not the position.** Its public inputs
+were `addr_f`, `PVK_A`, `C_spend` and the threshold — no `C_receive`. Investigating that turned the
+finding inside out: the omission is not ours, it is what `SELECTIVE_DISCLOSURE.md` §9 specifies its
+verifier flow to resolve. For a **floor** it is sound and merely slack (spendable ≤ position, so
+the predicate can only under-claim; a holder with 400 000 spendable and 200 000 unmerged holds
+600 000 and could not prove clearing 500 000). For the **ceiling** variant the same spec names in
+the same sentence, it is a hole: park value in `C_receive`, prove compliance, exceed the cap.
+Promoted to upstream **finding 7** and closed here by DB3b — open `C_receive`, bound `v_s + v_r`,
+which is what `circuits/seize` already did. Cost: 43 → 67 ACIR opcodes, proving 2.06 s → 2.68 s,
+public inputs 6 → 8 (192 → 256 bytes).
 
-**Attestations do not expire.** S3 proves the *proof* cannot be replayed once the balance moves —
-the strong half. The weak half is the record: `is_attested()` stays true afterwards, and nothing
-forces a consumer to read `attested_at_ledger`. Same family as upstream finding 6: the easiest
-read gives the least safe answer. The smallest fix is to drop `is_attested` and make consumers
-apply their own freshness window; the friendlier fix is a validity window in the constructor, at
-the cost of putting jurisdictional policy inside the verifier — which is what
-`profiles/cvm175.json` exists to keep out. Not blocking for the submission; decided before reuse.
+**Attestations did not expire.** S3 proves the *proof* cannot be replayed once the balance moves —
+that half was already sound, and it is structural, since verification reads the live commitment.
+The weak half was the record: `is_attested(account)` answered `true` forever. `is_attested` now
+takes `max_age_ledgers` and there is deliberately no argument-free form, so the easiest call to
+write is no longer the one that ignores staleness. The window is a parameter rather than contract
+state because how long an attestation stays meaningful is a jurisdictional question, and
+`profiles/*.json` is where this project keeps those. `u32::MAX` means "ever attested", which a
+caller must now say out loud.
 
-Full review, including what the probes confirmed: `docs/REVISAO-ARQUITETURA-2026-08-06.md`.
+Demonstrated on the same record, after the balance moved:
+
+```
+ℹ️  the S1 record survives the move, but the window is the caller's:
+     is_attested(max_age=1000) = true   is_attested(max_age=0) = false
+```
+
+Full review: `docs/REVISAO-ARQUITETURA-2026-08-06.md`.
 
 ## 7. Toolchain
 

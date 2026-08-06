@@ -87,12 +87,16 @@ fn main(
     sk: Field,
     v_s: Field,
     r_s: Field,
+    v_r: Field,
+    r_r: Field,
     // Public inputs.
     addr_f: pub Field,
     pvk_a_x: pub Field,
     pvk_a_y: pub Field,
     c_spend_x: pub Field,
     c_spend_y: pub Field,
+    c_receive_x: pub Field,
+    c_receive_y: pub Field,
     v_threshold: pub Field,
 ) {
     // D1
@@ -103,18 +107,30 @@ fn main(
     assert(pvk_derived.x == pvk_a_x);
     assert(pvk_derived.y == pvk_a_y);
 
-    // DB3
+    // DB3 -- the spendable commitment opens to v_s.
     let c_spend_derived = commit(v_s, r_s);
     assert(c_spend_derived.x == c_spend_x);
     assert(c_spend_derived.y == c_spend_y);
 
-    // D5 -- must precede DB4: it is what stops a wrapped-negative v_s.
+    // DB3b -- the receiving commitment opens to v_r. Beyond SELECTIVE_DISCLOSURE.md
+    // section 9, whose verifier flow resolves only PVK_A and C_spend. Without this the
+    // predicate is over the SPENDABLE balance rather than the position, which is sound
+    // but slack for a floor and outright evadable for a ceiling: a holder parks value
+    // in C_receive and proves to be under a cap while holding more than it. The mirror
+    // circuit disclose_balance_le, which the spec also names, inherits that hole. The
+    // seize circuit already binds both commitments; this matches it.
+    let c_receive_derived = commit(v_r, r_r);
+    assert(c_receive_derived.x == c_receive_x);
+    assert(c_receive_derived.y == c_receive_y);
+
+    // D5 -- must precede DB4: it is what stops a wrapped-negative balance.
     v_s.assert_max_bit_size::<127>();
+    v_r.assert_max_bit_size::<127>();
 
     // DB4b
     v_threshold.assert_max_bit_size::<127>();
 
-    // DB4 -- v_s >= v_threshold, expressed as a non-negative difference in the
+    // DB4 -- v_s + v_r >= v_threshold, expressed as a non-negative difference in the
     // same 127-bit idiom the transfer circuit uses for its range validity.
-    (v_s - v_threshold).assert_max_bit_size::<127>();
+    (v_s + v_r - v_threshold).assert_max_bit_size::<127>();
 }

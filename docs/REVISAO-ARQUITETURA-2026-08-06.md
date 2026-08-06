@@ -8,19 +8,26 @@ O resumo honesto: **a fronteira de confiança se sustentou em todos os nove ataq
 achou um problema real — que não é um bug no que existe, é uma armadilha montada para o próximo
 item do roadmap.
 
+> **Atualização, mesmo dia — os dois achados do §3 foram corrigidos.** Ao investigar o §3.1
+> descobri que o escopo gastável não era descuido nosso: é o que a `SELECTIVE_DISCLOSURE.md` §9
+> da OpenZeppelin manda resolver. Isso promove o achado de "limitação nossa" para **achado
+> upstream nº 7** — e o mais sério do conjunto, porque é soundness em especificação, não erro de
+> documentação. Correções aplicadas: DB3b no circuito, `C_receive` nos inputs públicos do
+> contrato, e `is_attested` agora exige uma janela de frescor. Detalhes no §6.
+
 ---
 
 ## 1. Baseline: o que roda hoje
 
 | Pacote | Testes | Como foi verificado |
 |---|---|---|
-| `circuits/disclose_balance_ge` | **12** ✅ | `nargo test` (era 11; +1 nesta revisão, ver §3.1) |
+| `circuits/disclose_balance_ge` | **14** ✅ | `nargo test` (era 11; +3 nesta revisão, ver §3.1 e §6) |
 | `circuits/seize` | 12 ✅ | `nargo test` |
 | `experiments/clawback-poc` | 9 ✅ | `nargo test` |
 | `experiments/circuit-cap-poc` | 34 ✅ | patch reaplicado sobre o `circuit_transfer` upstream |
 | `contracts/` | 3 wasm | `stellar contract build` |
 
-**67 testes.** O número que eu mais desconfiava era o do `circuit-cap-poc`, porque ele não é um
+**69 testes.** O número que eu mais desconfiava era o do `circuit-cap-poc`, porque ele não é um
 pacote — são dois patches contra o circuito de transferência da OpenZeppelin, e o README manda
 rodar só três `nargo test`. Reapliquei os patches sobre `refs/oz-stellar-contracts-main` e rodei:
 **34 testes passam e o `nargo info` marca 137 opcodes ACIR**, exatamente os números publicados
@@ -92,10 +99,9 @@ concentração enquanto detém mais que ele. A armadilha já está escrita no pl
 **Remédio, e ele é barato:** o `_le` deve ser modelado no `circuits/seize`, não no `_ge`. O seize
 já abre os *dois* commitments (Z2, Z3) e limita a soma (Z4) — o padrão certo já existe no repo.
 
-Deixei isso executável em vez de só documentado: `documents_that_only_the_spendable_balance_is_in_scope`,
-em `circuits/disclose_balance_ge/src/tests.nr`, é um teste `should_fail` que demonstra o falso
-negativo e explica no comentário por que a inversão seria insegura. Quem for construir o `_le` vai
-esbarrar nele.
+**Corrigido — ver §6.** E ao investigar, o achado virou do avesso: a omissão não é nossa. É o que
+a `SELECTIVE_DISCLOSURE.md` §9 manda o verificador resolver — só `PVK_A` e `C_spend`. Virou o
+achado upstream nº 7.
 
 ### 3.2 A atestação não expira
 
@@ -113,9 +119,8 @@ menos segura. Duas saídas, com o trade-off explícito:
   coloca política jurisdicional dentro do verificador, que é justamente o que o
   `profiles/cvm175.json` existe para manter fora.
 
-**Recomendo a primeira**, coerente com a escolha que o projeto já fez de manter jurisdição como
-configuração. Não é bloqueante para a submissão — é o tipo de coisa que precisa estar decidida
-antes de qualquer reuso.
+**Corrigido — ver §6**, por um meio-termo entre as duas: a janela existe, mas é *parâmetro* e não
+estado do contrato, então a ergonomia fica e a política continua fora do verificador.
 
 ### 3.3 Os contratos não têm testes unitários
 
@@ -163,3 +168,60 @@ abrir mão do helper `verifier::storage` da OpenZeppelin.
 2. Decidir o §3.2 (expiração da atestação) antes de qualquer reuso. **Uma decisão, não código.**
 3. Se o `disclose_balance_le` for construído, modelá-lo no `seize`. O teste do §3.1 já está lá
    para lembrar. **Só quando chegar a vez.**
+
+---
+
+## 6. Correções aplicadas
+
+Ambos os achados do §3 foram fechados no mesmo dia, com `velum-attest` redeployado e a bateria
+inteira re-executada contra o contrato novo: **9/9**.
+
+### 6.1 DB3b — o predicado passa a ser sobre a posição
+
+O circuito agora abre os **dois** commitments e limita a soma:
+
+```noir
+// DB3b -- o commitment de recebimento abre para v_r
+let c_receive_derived = commit(v_r, r_r);
+assert(c_receive_derived.x == c_receive_x);
+assert(c_receive_derived.y == c_receive_y);
+...
+// DB4 -- v_s + v_r >= v_threshold
+(v_s + v_r - v_threshold).assert_max_bit_size::<127>();
+```
+
+O `velum-attest` monta `C_receive` nos inputs públicos junto com o resto do registro que já lia do
+token — 6 → 8 elementos de corpo, 192 → 256 bytes. Custo: **43 → 67 opcodes ACIR** e prova de
+2,06 s → 2,68 s. Ainda mais barato que o `seize` (93).
+
+Três testes novos no lugar do que documentava a limitação:
+`accepts_a_position_split_across_spendable_and_receiving` (400 000 + 200 000 agora atesta contra
+500 000), `rejects_a_position_still_short_once_both_sides_are_counted`, e
+`rejects_an_unopenable_receiving_balance` — porque DB3b é uma abertura de verdade, não uma
+declaração: ninguém infla a posição alegando um `v_r` cujo commitment não consegue produzir.
+
+### 6.2 `is_attested` com janela de frescor
+
+```rust
+pub fn is_attested(e: &Env, account: Address, max_age_ledgers: u32) -> bool
+```
+
+Sem forma sem argumento. A janela é parâmetro e não estado do contrato porque *quanto tempo uma
+atestação continua significando alguma coisa* é pergunta jurisdicional, e é isso que o
+`profiles/*.json` guarda. Quem quiser "atestou alguma vez" passa `u32::MAX` — e passa a dizer isso
+em voz alta.
+
+Demonstrado no mesmo registro, depois do saldo mudar:
+
+```
+is_attested(max_age=1000) = true   is_attested(max_age=0) = false
+```
+
+Antes, as duas perguntas devolviam `true`.
+
+### 6.3 O que isso custou em endereço
+
+`velum-attest` mudou de VK, então mudou de endereço:
+`CBCBSILY5B562Q263W4EDYU7IHBV3SSM3IFWA333MII3OK3QRGNCDXKY`. O v1
+(`CDEDFUYU…7LPK`) segue no ar como controle. README, roteiro de vídeo, perfil regulatório e
+registro de implementação foram atualizados.

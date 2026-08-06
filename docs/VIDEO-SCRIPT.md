@@ -88,7 +88,7 @@ VELUM_TOKEN=CBDT4EKUF66MS7HHDHMLDPDI7TOPZCV7AYYLC53ES7TEB67KAT3BFWV5 \
 **Comando:**
 
 ```bash
-VELUM_ATTEST=CDEDFUYUNNQLU4C7ISKXJ26AIPIR42UJPW7XO72EZFEC3Y6VT6OO7LPK \
+VELUM_ATTEST=CBCBSILY5B562Q263W4EDYU7IHBV3SSM3IFWA333MII3OK3QRGNCDXKY \
   pnpm exec tsx ../../../../scripts/demo-attest.ts
 ```
 
@@ -106,9 +106,9 @@ position established. On the explorer this balance is a commitment:
 aberta:
 
 ```
-proof: 14592 B in 2.06s
+proof: 14592 B in 2.68s
 ✅ attested on-chain — tx …
-is_attested = true
+is_attested(max_age=1000) = true
 ```
 
 > "The holder proves the position clears five hundred thousand. A Soroban contract reads the
@@ -143,7 +143,10 @@ is_attested = true
 > verified it in code — premise, circuit, and the circuit running on-chain: an authority proving a
 > partial seizure fits inside a position it cannot read.
 >
-> Along the way we found six defects in their material. One of them matters: a claim topic with no
+> Along the way we found seven defects in their material. The sharpest is in the specification
+> itself: its disclosure flow reads only the spendable commitment, which is harmless for a floor
+> and evadable for the ceiling variant it names in the same sentence — park value on the receiving
+> side and you are under any cap. We bind both. A second one matters too: a claim topic with no
 > trusted issuer is skipped in silence, so an operator who tightens the rules and forgets the
 > issuer gets no enforcement at all. Our adapter fails closed on that."
 

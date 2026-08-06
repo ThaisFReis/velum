@@ -38,7 +38,7 @@ demo was patched to make this work.
 |---|---|
 | `contracts/velum-policy` | Adapter: the token's `Policy` gate → the RWA `IdentityVerifier`. Also **fails closed** on a registry misconfiguration upstream ignores silently (finding 6). |
 | `contracts/velum-attest` | On-chain verifier for position proofs — a component upstream's spec marks *out of scope* (§§5.4, 14). |
-| `circuits/disclose_balance_ge` | The predicate circuit upstream **specifies** (`SELECTIVE_DISCLOSURE.md` §9) **and does not ship**. No public implementation exists in any repository, branch, tag or history — see [provenance](docs/WHITEPAPER.md). |
+| `circuits/disclose_balance_ge` | The predicate circuit upstream **specifies** (`SELECTIVE_DISCLOSURE.md` §9) **and does not ship**. No public implementation exists in any repository, branch, tag or history — see [provenance](docs/WHITEPAPER.md). We bind `C_receive` as well, which the spec omits — finding 7. |
 | `circuits/seize` + `contracts/velum-seize` | Answers upstream's open question on individual clawback: premise verified, circuit built, and a partial seizure **verified on-chain** — bounded by a position the ledger never reveals. |
 | `experiments/` | Two research artifacts: the clawback premise, and a quantitative rule inside upstream's transfer circuit (+3 % cost). |
 | `profiles/cvm175.json` | A jurisdiction as configuration — claim topics, thresholds, issuer controls — annotated with what is actually enforced and what is merely declared. |
@@ -54,7 +54,7 @@ RWA/T-REX module, the UltraHonk verifier, and the reference demo's SDK. Study cl
 
 | Contract | Address |
 |---|---|
-| `velum-attest` | `CDEDFUYUNNQLU4C7ISKXJ26AIPIR42UJPW7XO72EZFEC3Y6VT6OO7LPK` |
+| `velum-attest` | `CBCBSILY5B562Q263W4EDYU7IHBV3SSM3IFWA333MII3OK3QRGNCDXKY` |
 | `velum-seize` | `CDVV37Y766VSLNRRIHRXBTUCEN7UJU7QQVROLWYVA6L7FRTKJO3Z2LE5` |
 | `velum-policy` | `CDJET5BV36RDRNCNCNXJFYWUKPCX4VWXTUY4EGU4W5VUJ3FHLHIYFPKV` |
 | identity-gated confidential token | `CBDT4EKUF66MS7HHDHMLDPDI7TOPZCV7AYYLC53ES7TEB67KAT3BFWV5` |
@@ -84,8 +84,8 @@ noirup --version 1.0.0-beta.11        # nargo
 bbup -v 0.87.0                        # bb (local circuit work only)
 # plus: stellar-cli >= 25.2, Rust with wasm32v1-none, Node >= 20, pnpm 10
 
-# circuits — 67 tests across four packages
-cd circuits/disclose_balance_ge && nargo test      # 12
+# circuits — 69 tests across four packages
+cd circuits/disclose_balance_ge && nargo test      # 14
 cd ../seize && nargo test                          # 12
 cd ../../experiments/clawback-poc && nargo test    # 9
 
@@ -111,7 +111,7 @@ The two demos run against the deployed contracts above:
 cd refs/ct-demo/packages/sdk
 
 # position proved and verified on-chain, plus the false claim that cannot be built
-VELUM_ATTEST=CDEDFUYUNNQLU4C7ISKXJ26AIPIR42UJPW7XO72EZFEC3Y6VT6OO7LPK \
+VELUM_ATTEST=CBCBSILY5B562Q263W4EDYU7IHBV3SSM3IFWA333MII3OK3QRGNCDXKY \
   pnpm exec tsx ../../../../scripts/demo-attest.ts
 
 # identity gating: one wallet with a claim, one without
@@ -123,7 +123,7 @@ VELUM_SEIZE=CDVV37Y766VSLNRRIHRXBTUCEN7UJU7QQVROLWYVA6L7FRTKJO3Z2LE5 \
   pnpm exec tsx ../../../../scripts/demo-seize.ts
 
 # nine adversarial probes: proof transplant, stale replay, alpha tampering, the owner gate
-VELUM_ATTEST=CDEDFUYUNNQLU4C7ISKXJ26AIPIR42UJPW7XO72EZFEC3Y6VT6OO7LPK \
+VELUM_ATTEST=CBCBSILY5B562Q263W4EDYU7IHBV3SSM3IFWA333MII3OK3QRGNCDXKY \
 VELUM_SEIZE=CDVV37Y766VSLNRRIHRXBTUCEN7UJU7QQVROLWYVA6L7FRTKJO3Z2LE5 \
   pnpm exec tsx ../../../../scripts/stress.ts
 ```
@@ -137,7 +137,7 @@ VELUM_SEIZE=CDVV37Y766VSLNRRIHRXBTUCEN7UJU7QQVROLWYVA6L7FRTKJO3Z2LE5 \
 
 ## Findings reported upstream
 
-Six, each with reproduction. Three are documentation or tooling; three are behavioural.
+Seven, each with reproduction. Three are documentation or tooling; three are behavioural; one is a soundness gap in the specification itself.
 
 1. **`addr_f` is not readable by third parties** — it lives in the token's instance storage and
    `address_to_field` is `pub(crate)`, so an external verifier can neither read nor recompute it,
@@ -153,8 +153,13 @@ Six, each with reproduction. Three are documentation or tooling; three are behav
    error and no event, so an operator who tightens the rules and forgets the issuer gets **no
    enforcement at all**. `velum-policy` fails closed on that state; the A/B demonstration is in the
    implementation record.
-
----
+7. **`SELECTIVE_DISCLOSURE.md` §9 resolves only `C_spend`, which makes the specified
+   `disclose_balance_le` evadable.** A confidential account holds value in two commitments;
+   `C_receive` is not among the state the §9 verifier flow reads. For the `ge` shape this is sound
+   but slack. For the `le` shape — introduced in the same sentence, as though a mirror image — it is
+   a hole: a concentration ceiling is the obvious rule to build from it, and a holder can park value
+   in `C_receive` and prove compliance while exceeding the cap. We bind both commitments; it costs
+   43 → 67 ACIR opcodes.
 
 ## What we are not claiming
 

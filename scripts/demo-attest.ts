@@ -79,18 +79,23 @@ function prover(): CircuitProver {
  * the prover commits to the same statement, not how it chooses one.
  */
 function inputs(a: {
-  sk: bigint; vS: bigint; rS: bigint; addrF: bigint;
-  pvk: { x: bigint; y: bigint }; cSpend: { x: bigint; y: bigint }; threshold: bigint;
+  sk: bigint; vS: bigint; rS: bigint; vR: bigint; rR: bigint; addrF: bigint;
+  pvk: { x: bigint; y: bigint }; cSpend: { x: bigint; y: bigint };
+  cReceive: { x: bigint; y: bigint }; threshold: bigint;
 }) {
   return {
     sk: hex(a.sk),
     v_s: hex(a.vS),
     r_s: hex(a.rS),
+    v_r: hex(a.vR),
+    r_r: hex(a.rR),
     addr_f: hex(a.addrF),
     pvk_a_x: hex(a.pvk.x),
     pvk_a_y: hex(a.pvk.y),
     c_spend_x: hex(a.cSpend.x),
     c_spend_y: hex(a.cSpend.y),
+    c_receive_x: hex(a.cReceive.x),
+    c_receive_y: hex(a.cReceive.y),
     v_threshold: hex(a.threshold),
   };
 }
@@ -142,6 +147,7 @@ async function main(): Promise<void> {
   const onChain = await client.confidentialBalance(kp.publicKey());
   if (!onChain) throw new Error("account not registered on chain");
   const cSpend = onChain.spendableBalance.toAffine();
+  const cReceive = onChain.receivingBalance.toAffine();
   const pvk = onChain.viewingPublicKey.toAffine();
   console.log(`  position established. On the explorer this balance is a commitment:`);
   console.log(`    C_spend.x = ${hex(cSpend.x)}`);
@@ -152,7 +158,8 @@ async function main(): Promise<void> {
   const t0 = Date.now();
   const { proof } = await p.prove(inputs({
     sk: keys.sk, vS: state.spendable.v, rS: state.spendable.r,
-    addrF, pvk, cSpend, threshold,
+    vR: state.receiving.v, rR: state.receiving.r,
+    addrF, pvk, cSpend, cReceive, threshold,
   }));
   console.log(`  proof: ${proof.length} B in ${((Date.now() - t0) / 1000).toFixed(2)}s`);
 
@@ -163,9 +170,14 @@ async function main(): Promise<void> {
   console.log(`  ✅ attested on-chain — tx ${sh(res.hash)}`);
   console.log(`     https://stellar.expert/explorer/testnet/tx/${res.hash}`);
 
+  // The freshness window is the caller's to choose; there is no argument-free form.
+  const FRESH = 1000; // ledgers ~ 1.5 h
   const isAttested = await client.simulate(attest, "is_attested",
-    [new Address(kp.publicKey()).toScVal()]);
-  console.log(`  is_attested = ${xdr.ScVal.fromXDR(isAttested.toXDR()).value()}`);
+    [new Address(kp.publicKey()).toScVal(), xdr.ScVal.scvU32(FRESH)]);
+  console.log(`  is_attested(max_age=${FRESH} ledgers) = ${xdr.ScVal.fromXDR(isAttested.toXDR()).value()}`);
+  const stale = await client.simulate(attest, "is_attested",
+    [new Address(kp.publicKey()).toScVal(), xdr.ScVal.scvU32(0)]);
+  console.log(`  is_attested(max_age=0)         = ${xdr.ScVal.fromXDR(stale.toXDR()).value()}  ← same record, stricter window`);
   console.log(`     the contract learned the position clears ${threshold} — and nothing else.`);
 
   // --- the dishonest one ------------------------------------------------
@@ -173,7 +185,9 @@ async function main(): Promise<void> {
   try {
     await p.prove(inputs({
       sk: keys.sk, vS: state.spendable.v, rS: state.spendable.r,
-      addrF, pvk, cSpend, threshold: state.spendable.v + 1n,
+      vR: state.receiving.v, rR: state.receiving.r,
+      addrF, pvk, cSpend, cReceive,
+      threshold: state.spendable.v + state.receiving.v + 1n,
     }));
     console.log("  ✗ UNEXPECTED: a proof was produced for a false claim");
     process.exitCode = 1;

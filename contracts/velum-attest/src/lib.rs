@@ -186,13 +186,21 @@ impl VelumAttestContract {
         let record = ConfidentialTokenClient::new(e, &token).confidential_balance(&account);
 
         // Public-input order mirrors `circuits/disclose_balance_ge/src/main.nr`:
-        //   addr_f, PVK_A.x, PVK_A.y, C_spend.x, C_spend.y, v_threshold
+        //   addr_f, PVK_A.x, PVK_A.y, C_spend.x, C_spend.y, C_receive.x, C_receive.y, v_threshold
         // A Grumpkin `Point` is `BytesN<64>` laid out `be(x) || be(y)`, so
-        // appending the point yields its two coordinates in order. 192 bytes.
+        // appending the point yields its two coordinates in order. 8 field elements,
+        // 256 bytes.
+        //
+        // `C_receive` is here and not in upstream's spec. SELECTIVE_DISCLOSURE.md section 9
+        // resolves only `PVK_A` and `C_spend`, which makes the predicate one about the
+        // *spendable* balance rather than the position: sound but slack for a floor, and
+        // evadable for the ceiling variant the same spec names, since a holder can park
+        // value in `C_receive`. Binding both is what `circuits/seize` already does.
         let mut pi = Bytes::new(e);
         pi.append(&Bytes::from(addr_f));
         append_point(e, &mut pi, &record.viewing_public_key);
         append_point(e, &mut pi, &record.spendable_balance);
+        append_point(e, &mut pi, &record.receiving_balance);
         pi.append(&Bytes::from(threshold.clone()));
 
         if !vk_registry::verify_proof(e, DISCLOSE_BALANCE_GE, &pi, &proof) {
@@ -217,14 +225,30 @@ impl VelumAttestContract {
             .unwrap_or_else(|| panic_with_error!(e, VelumAttestError::NotAttested))
     }
 
-    /// Whether `account` has an attestation on record. Consumers that care about
-    /// staleness should read [`attestation`] and judge `attested_at_ledger`.
+    /// Whether `account` carries an attestation no older than `max_age_ledgers`.
     ///
-    /// [`attestation`]: VelumAttestContract::attestation
-    pub fn is_attested(e: &Env, account: Address) -> bool {
-        e.storage()
+    /// The window is a parameter and not contract state on purpose. An attestation is a
+    /// point-in-time fact: a proof cannot be replayed once the balance moves, because
+    /// verification reads the live commitment — but the *record* of an earlier one stays
+    /// on the ledger, and how long it remains meaningful is a jurisdictional question, not
+    /// a cryptographic one. Keeping the window here leaves that judgment with the consumer
+    /// and the regulatory profile, which is where `profiles/*.json` already keeps it.
+    ///
+    /// There is deliberately no argument-free form. An `is_attested(account)` would answer
+    /// `true` forever, and the easiest call to write should not be the one that silently
+    /// ignores staleness — the same footgun we reported upstream as finding 6.
+    ///
+    /// Pass `u32::MAX` for "ever attested, at any time", which is occasionally what a
+    /// caller genuinely wants and should have to say out loud.
+    pub fn is_attested(e: &Env, account: Address, max_age_ledgers: u32) -> bool {
+        match e
+            .storage()
             .persistent()
-            .has(&VelumAttestKey::Attestation(account))
+            .get::<_, Attestation>(&VelumAttestKey::Attestation(account))
+        {
+            Some(a) => e.ledger().sequence().saturating_sub(a.attested_at_ledger) <= max_age_ledgers,
+            None => false,
+        }
     }
 
     /// The floor currently in force.
