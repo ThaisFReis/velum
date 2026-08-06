@@ -46,7 +46,7 @@ Claim topic 1 (KYC) registered; the claim issuer is trusted for it; an Ed25519 s
 authorised; the holder's identity contract carries a signed KYC claim; and the holder is
 registered in the identity registry with a Brazilian residence profile
 (tx `da8c0a6c…376e`, events `IdentityStored` + `country_data_added`). That last call needed the
-XDR-JSON payload in §6.4 — the format documented upstream cannot work.
+XDR-JSON payload in §6, finding 4 — the format documented upstream cannot work.
 
 ---
 
@@ -435,6 +435,21 @@ gate whose failure mode is silent under-enforcement, that is the right side to e
 deployment that wants the cheaper path can move the check to configuration time — at the price of
 going stale when the registry changes.
 
+## 6.4 Wall-clock cost of the demos
+
+Measured end to end on testnet, because it changes how the demo can be presented:
+
+| Script | Real time | Where it goes |
+|---|---|---|
+| `demo-attest.ts` | **3 m 39 s** | transaction confirmation — register, deposit, merge, attest |
+| `demo-gate.ts` | **1 m 55 s** | same |
+| `demo-seize.ts` | not separately timed | dominated by the same register → deposit → merge sequence |
+| the proof itself | **2.06 s** | the fast part |
+
+Proving is not the bottleneck; testnet confirmation is. A three-minute video cannot run both live,
+so `docs/VIDEO-SCRIPT.md` records each separately and speeds up the waiting visibly rather than
+cutting it — the honest edit, not the flattering one.
+
 ## 6.5 Two architectural findings from the review
 
 Neither is a defect in what is deployed; both would become one on the next step.
@@ -459,21 +474,6 @@ the cost of putting jurisdictional policy inside the verifier — which is what
 `profiles/cvm175.json` exists to keep out. Not blocking for the submission; decided before reuse.
 
 Full review, including what the probes confirmed: `docs/REVISAO-ARQUITETURA-2026-08-06.md`.
-
-## 6.4 Wall-clock cost of the demos
-
-Measured end to end on testnet, because it changes how the demo can be presented:
-
-| Script | Real time | Where it goes |
-|---|---|---|
-| `demo-attest.ts` | **3 m 39 s** | transaction confirmation — register, deposit, merge, attest |
-| `demo-gate.ts` | **1 m 55 s** | same |
-| `demo-seize.ts` | not separately timed | dominated by the same register → deposit → merge sequence |
-| the proof itself | **2.06 s** | the fast part |
-
-Proving is not the bottleneck; testnet confirmation is. A three-minute video cannot run both live,
-so `docs/VIDEO-SCRIPT.md` records each separately and speeds up the waiting visibly rather than
-cutting it — the honest edit, not the flattering one.
 
 ## 7. Toolchain
 
