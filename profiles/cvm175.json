@@ -10,7 +10,7 @@
     "note": "Engineering intent, not legal advice. The mapping below is the subset a token can enforce; everything else lives in the fund's documents and its administrator."
   },
   "identity": {
-    "comment": "The qualitative half: who may hold. Enforced on every token operation via velum-policy, which asks the RWA identity verifier.",
+    "comment": "The qualitative half: who may hold. Enforced on every token operation via velum-policy, which asks the RWA identity verifier. IMPORTANT: a claim topic only takes effect when at least one trusted issuer is registered FOR THAT TOPIC. Registering the topic alone is a silent no-op — verify_identity iterates (topic, issuers) pairs and skips a topic whose issuer list is empty, with no error. Always pair a topic with its issuers here and on-chain.",
     "claim_topics": [
       {
         "id": 1,
@@ -23,7 +23,8 @@
         "id": 2,
         "name": "qualified_investor",
         "required": false,
-        "comment": "Investidor qualificado under CVM 175. Declared here but NOT yet enforced: only topic 1 is registered in the deployed claim-topics registry. Turning this on is a registry call, not a code change."
+        "comment": "Investidor qualificado under CVM 175. Declared, not active: neither the topic nor an issuer for it is registered in the deployed registry. VERIFIED that turning it on works — with topic 2 registered AND the issuer trusted for it, a holder carrying only topic 1 flipped to is_authorized=false; with the topic registered but NO issuer, the same holder stayed authorized. State restored afterwards.",
+        "verified_on_testnet": true
       }
     ],
     "trusted_issuers": [
@@ -32,7 +33,8 @@
         "topics": [
           1
         ],
-        "comment": "Address supplied at deploy time. In production this is the fund's KYC provider or its administrator."
+        "comment": "Address supplied at deploy time; in production the fund's KYC provider or its administrator. Its topic set is what makes a topic bite — see the warning above.",
+        "verified_on_testnet": true
       }
     ]
   },
@@ -44,7 +46,8 @@
       "circuit": "disclose_balance_ge",
       "enforced": false,
       "comment": "The holder proves position >= this value and a contract records it. Note the distinction: this is ATTESTABLE, not enforced — nothing compels a holder to attest, and no operation is blocked for lack of an attestation. A consumer (transfer agent, distributor, another contract) decides what to require. Enforcing it inside the transfer would need the quantitative rule in the circuit itself — see experiments/circuit-cap-poc. Also note this is the ticket floor, not the CVM net-worth test for investidor qualificado, which is an identity claim (topic 2) attested off-chain.",
-      "attestable": true
+      "attestable": true,
+      "verified_on_testnet": true
     },
     "concentration_ceiling": {
       "value": null,
@@ -65,8 +68,8 @@
     },
     "sac_passthrough": {
       "enabled": true,
-      "comment": "The classic issuer's own set_authorized/freeze cascades into the confidential wrapper with no state mirrored by the token admin.",
-      "verified_on_testnet": true
+      "comment": "Configured (the deployment event records sac_passthrough: true) but its EFFECT is untestable on this deployment: the underlying is the native XLM SAC, which has no admin and whose authorized() is always true, so there is no issuer able to deauthorize an account. Exercising the cascade needs an underlying with a real issuer — e.g. the fund's own classic asset with AUTH_REVOCABLE. Marked unverified rather than assumed.",
+      "verified_on_testnet": false
     },
     "clawback": {
       "individual": false,

@@ -271,6 +271,12 @@ Five, all with reproduction.
    ```
 5. **`identity-registry` hardcodes `IdentityType::Individual`** in `add_identity`, so a
    `CountryRelation::Organization` profile is stored as a natural person.
+6. **A required claim topic with no trusted issuer is silently ignored.** `verify_identity`
+   iterates `(topic, issuers)` pairs; a topic whose issuer list is empty never enters the inner
+   loop, so it never raises. An operator who registers a topic to tighten the rules — and forgets
+   the issuer — gets **silent non-enforcement**, with no error and no event to notice. Verified
+   both ways on testnet: topic 2 registered alone left an unqualified holder authorized; the same
+   topic with the issuer trusted for it flipped that holder to refused.
 
 ---
 
@@ -283,6 +289,19 @@ nothing compels the holder to attest and no operation is blocked for its absence
 decides what to require. Enforcing it inside a transfer needs the rule in the circuit
 (`experiments/circuit-cap-poc`). The field now reads `enforced: false, attestable: true`, and
 every claim carries `verified_on_testnet` where we exercised it.
+
+## 6.2 Seals, and one we had not earned
+
+Every claim in the profile now carries `verified_on_testnet` only where we exercised it. Two
+corrections came out of the audit:
+
+- **`sac_passthrough` lost its seal.** It is configured — the deployment event records it — but
+  its effect cannot be exercised here: the underlying is the native XLM SAC, which has no admin
+  and whose `authorized()` is always `true`, so no issuer can deauthorize anyone. Testing the
+  cascade needs an underlying with a real issuer. We had marked it verified on the strength of the
+  configuration event, which is exactly the mistake this section exists to prevent.
+- **Claim topic 2 earned one.** Not because it is active — it is not — but because we proved the
+  switch works, in both directions, and restored the state afterwards.
 
 ## 7. Toolchain
 
