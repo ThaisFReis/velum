@@ -84,10 +84,16 @@ noirup --version 1.0.0-beta.11        # nargo
 bbup -v 0.87.0                        # bb (local circuit work only)
 # plus: stellar-cli >= 25.2, Rust with wasm32v1-none, Node >= 20, pnpm 10
 
-# circuits — 66 tests across four packages
-cd circuits/disclose_balance_ge && nargo test      # 11
+# circuits — 67 tests across four packages
+cd circuits/disclose_balance_ge && nargo test      # 12
 cd ../seize && nargo test                          # 12
 cd ../../experiments/clawback-poc && nargo test    # 9
+
+# the remaining 34 are two patches against upstream's transfer circuit, not a package:
+cd refs/oz-stellar-contracts-main/packages/tokens/src/confidential/circuits/transfer
+patch -p1 < ../../../../../../../../experiments/circuit-cap-poc/transfer-main.patch
+patch -p1 < ../../../../../../../../experiments/circuit-cap-poc/transfer-tests.patch
+nargo test && nargo info    # 34 tests, main goes 133 -> 137 ACIR opcodes; git checkout -- src/ to revert
 
 # contracts
 cd ../../contracts && stellar contract build
@@ -115,6 +121,11 @@ VELUM_TOKEN=CBDT4EKUF66MS7HHDHMLDPDI7TOPZCV7AYYLC53ES7TEB67KAT3BFWV5 \
 # a partial seizure proved against a position that stays unreadable
 VELUM_SEIZE=CDVV37Y766VSLNRRIHRXBTUCEN7UJU7QQVROLWYVA6L7FRTKJO3Z2LE5 \
   pnpm exec tsx ../../../../scripts/demo-seize.ts
+
+# nine adversarial probes: proof transplant, stale replay, alpha tampering, the owner gate
+VELUM_ATTEST=CDEDFUYUNNQLU4C7ISKXJ26AIPIR42UJPW7XO72EZFEC3Y6VT6OO7LPK \
+VELUM_SEIZE=CDVV37Y766VSLNRRIHRXBTUCEN7UJU7QQVROLWYVA6L7FRTKJO3Z2LE5 \
+  pnpm exec tsx ../../../../scripts/stress.ts
 ```
 
 > Run `demo-attest.ts` without `VELUM_ATTEST` and it prints the verification key needed to deploy
@@ -170,6 +181,7 @@ Six, each with reproduction. Three are documentation or tooling; three are behav
 | [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md) | Addresses, hashes, console output, measured costs — and the failures that cost us time |
 | [`docs/Velum-OnePage.pdf`](docs/Velum-OnePage.pdf) · [`docs/Velum-Deck.pdf`](docs/Velum-Deck.pdf) | One page; ten slides |
 | [`circuits/README.md`](circuits/README.md) | Both circuits: constraints, results, reproduction |
+| [`docs/REVISAO-ARQUITETURA-2026-08-06.md`](docs/REVISAO-ARQUITETURA-2026-08-06.md) | Architecture review: nine adversarial probes (9/9), and two findings that would bite on the next step |
 | [`docs/SPIKE-CT-2026-08-04.md`](docs/SPIKE-CT-2026-08-04.md) | The de-risk that corrected our own first premise |
 
 Anchor case: a Brazilian receivables fund (FIDC) under CVM 175 — **Plina Finance**. The kit serves

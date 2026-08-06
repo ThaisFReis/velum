@@ -221,16 +221,65 @@ thing in its module docs, so the caveat cannot be lost by reading the code inste
 
 ---
 
+## 2.3 Nine adversarial probes against the deployed verifiers
+
+`scripts/stress.ts`, run against the live contracts with two real confidential positions
+(1 000 000 and 600 000). The demos show the happy path; this shows the system refusing. Each probe
+states what an attacker would gain, because a refusal only matters when the alternative was
+damaging.
+
+| # | Probe | What it would buy an attacker | Result |
+|---|---|---|---|
+| S1 | H1's proof, for H1 | (baseline) | ✅ accepted |
+| S2 | **H1's proof submitted for H2's account** | certifying a stranger | ✅ refused `#2` |
+| S3 | **the proof replayed after the balance moved** | a stale claim standing as current | ✅ refused `#2` |
+| S4 | a proof truncated by 32 bytes | evidence the proof is not read | ✅ refused `#2` |
+| S5 | **a stranger submitting a VALID seizure proof** | making anyone an authority | ✅ refused |
+| S6 | **the same valid proof under `amount = 1`** | decoupling alpha from the proof | ✅ refused `#1` |
+| S7 | `b_tilde_new = 0xff…ff`, outside the field | unchecked public inputs | ✅ refused `#2` |
+| S8 | a negative seizure amount | — | ✅ refused `#4` |
+| S9 | seizing the whole position (`remaining = 0`) | (boundary) | ✅ accepted |
+
+**9/9 behaved as designed.**
+
+S2 is the one that mattered most: `attest_position` is deliberately permissionless, so anyone may
+relay anyone's proof. That is only safe because D1/D2 bind the proof to the account's own viewing
+key and the contract reads `PVK_A` and `C_spend` from the token, live. The refusal confirms the
+argument in practice rather than on paper.
+
+S3 settles freshness. Depositing 1 unit and re-merging changes `C_spend`; the earlier proof was
+then refused. Because the contract reads the current commitment, a proof is only valid against the
+state it was made against — freshness is a consequence of where the inputs come from, not a policy
+someone must remember to apply.
+
+S5 needed a second, separate test to be conclusive. It failed on-chain, but that alone does not
+distinguish "stopped by the owner gate" from "failed for some other reason", and probing it
+directly through the CLI is masked by `#3501` (account not registered in the token), which traps
+before the gate. The gate was proven where the same macro is not masked — `set_threshold`, which
+reads no token state: the non-owner was refused with *"Missing signing key for account
+GAEZBHTK…KZQY"*, the `admin` address. `#[only_owner]` demands the owner's signature.
+
+S6 is what makes a seizure mean anything. A valid proof for 250 000, resubmitted declaring
+`amount = 1`, is rejected: `alpha` is a public input, so changing it invalidates the proof. The
+authority does not get to pick the number after proving.
+
+---
+
 ## 3. Circuits
 
 | Package | Tests | Cost | Proof |
 |---|---|---|---|
-| `circuits/disclose_balance_ge` | 11 ✅ | — | 14 592 B · 6 public inputs · 0.25 s (CLI) / 3.81 s (bb.js, in-process) |
+| `circuits/disclose_balance_ge` | 12 ✅ | — | 14 592 B · 6 public inputs · 0.25 s (CLI) / 3.81 s (bb.js, in-process) |
 | `circuits/seize` | 12 ✅ | 93 ACIR opcodes | 14 592 B · 0.33 s (CLI) / 2.06 s (bb.js) · **verified on-chain** (§2.2) |
 | `experiments/clawback-poc` | 9 ✅ | — | premise verification, no circuit |
 | `experiments/circuit-cap-poc` | 34 ✅ | 133 → 137 opcodes (+3 %) | patch against upstream's transfer circuit |
 
-**66 tests, all passing.**
+**67 tests, all passing.**
+
+The 34 in `circuit-cap-poc` are not a package — they are two patches against upstream's transfer
+circuit. Re-applied and re-run in this review: 34 pass and `nargo info` reports 137 ACIR opcodes,
+exactly the published figures (133 → 137, +3 %). Reproduction is in
+`experiments/circuit-cap-poc/README.md`.
 
 `disclose_balance_ge` implements `SELECTIVE_DISCLOSURE.md` §9 (constraints D1, D2, DB3, D5, DB4),
 plus one constraint beyond the spec: DB4b range-checks the threshold, so a malformed public input
@@ -386,6 +435,31 @@ gate whose failure mode is silent under-enforcement, that is the right side to e
 deployment that wants the cheaper path can move the check to configuration time — at the price of
 going stale when the registry changes.
 
+## 6.5 Two architectural findings from the review
+
+Neither is a defect in what is deployed; both would become one on the next step.
+
+**`disclose_balance_ge` proves over the *spendable* balance, not the position.** Its public inputs
+are `addr_f`, `PVK_A`, `C_spend` and the threshold — there is no `C_receive`. For a **floor** this
+is sound and merely conservative: spendable ≤ position, so proving spendable ≥ T implies
+position ≥ T; it can only under-claim (a holder with 400 000 spendable and 200 000 received but
+not yet rolled over cannot attest clearing 500 000). Inverting DB4 to build a **ceiling** flips
+that safety into a hole — a holder parks value in `C_receive` and proves they are under a
+concentration cap while holding more than it. That inversion is exactly how the roadmap describes
+`disclose_balance_le`. It must instead be modelled on `circuits/seize`, which opens both
+commitments (Z2, Z3) and bounds their sum (Z4). Recorded as an executable test:
+`documents_that_only_the_spendable_balance_is_in_scope`.
+
+**Attestations do not expire.** S3 proves the *proof* cannot be replayed once the balance moves —
+the strong half. The weak half is the record: `is_attested()` stays true afterwards, and nothing
+forces a consumer to read `attested_at_ledger`. Same family as upstream finding 6: the easiest
+read gives the least safe answer. The smallest fix is to drop `is_attested` and make consumers
+apply their own freshness window; the friendlier fix is a validity window in the constructor, at
+the cost of putting jurisdictional policy inside the verifier — which is what
+`profiles/cvm175.json` exists to keep out. Not blocking for the submission; decided before reuse.
+
+Full review, including what the probes confirmed: `docs/REVISAO-ARQUITETURA-2026-08-06.md`.
+
 ## 6.4 Wall-clock cost of the demos
 
 Measured end to end on testnet, because it changes how the demo can be presented:
@@ -415,6 +489,8 @@ Reproduction steps: `circuits/README.md` for the circuits, and for the on-chain 
 cd refs/ct-demo/packages/sdk
 VELUM_ATTEST=<contract-id> pnpm exec tsx ../../../../scripts/demo-attest.ts
 VELUM_SEIZE=<contract-id>  pnpm exec tsx ../../../../scripts/demo-seize.ts
+
+VELUM_ATTEST=<id> VELUM_SEIZE=<id> pnpm exec tsx ../../../../scripts/stress.ts   # the 9 probes
 ```
 
 Run either without its variable to print the verification key needed to deploy that contract.

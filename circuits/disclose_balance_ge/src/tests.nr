@@ -115,3 +115,24 @@ fn print_fixture_public_inputs() {
     println(f"c_spend_x = {cx}");
     println(f"c_spend_y = {cy}");
 }
+
+// ---------- the scope of the claim, made executable ----------
+
+#[test(should_fail)]
+fn documents_that_only_the_spendable_balance_is_in_scope() {
+    // A holder whose position is split -- 400_000 spendable, 200_000 received but not yet
+    // rolled over -- holds 600_000 and cannot prove they clear 500_000. There is no
+    // c_receive among this circuit's public inputs, so the predicate is over the SPENDABLE
+    // balance, not over the position.
+    //
+    // For a floor this is sound and merely conservative: spendable <= position, so proving
+    // spendable >= T implies position >= T. It never over-claims; it can only under-claim,
+    // as here.
+    //
+    // Inverting DB4 to build a CEILING would flip that safety into a hole: a holder could
+    // park value in c_receive and prove they are under a concentration cap while holding
+    // more than it. A `disclose_balance_le` must therefore be modelled on `circuits/seize`
+    // -- which opens BOTH commitments (Z2, Z3) and bounds their sum (Z4) -- and not on this
+    // circuit with the comparison reversed.
+    run(400_000, R_S, 500_000);
+}
