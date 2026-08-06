@@ -1,105 +1,165 @@
 # Velum
 
-> **Privacidade para o mercado, raio-X para o regulador.**
-> Compliance kit + token confidencial para ativos regulados na Stellar — sigilo bancário on-chain.
+> **Holder-attested compliance for Confidential Tokens on Stellar.**
+> A regulated fund can hide its register of holders — and still prove it obeys the rules.
+> Without revealing the amount to anyone. Including the verifier.
 
-Submissão para o **Stellar Summit SP 2026** (GrantFox), sub-lane **Enterprise, Compliance and RWA**
-(patrocínio OpenZeppelin + Nethermind).
+Submission to the **Stellar Summit SP 2026** (GrantFox), sub-lane **Enterprise, Compliance & RWA**
+(OpenZeppelin + Nethermind). Live on testnet · MIT · [whitepaper](docs/Velum-Whitepaper-v0.1.pdf) ·
+[one page](docs/Velum-OnePage.pdf) · [deck](docs/Velum-Deck.pdf)
 
-## O que é
+---
 
-Compliance de fundo regulado tem duas metades. A OpenZeppelin entregou os primitivos das duas,
-mas ligou nenhuma:
+## The problem
 
-| Metade | Pergunta regulatória | Estado upstream | Velum |
-|---|---|---|---|
-| **Qualitativa** | *Quem* pode deter? | Gating por **endereço** (allowlist/blocklist). Ligar ao registro de identidade do RWA é a issue **#766**, aberta em 06/07/2026, sem release | `velum-policy` — gating por **identidade**: claim de investidor qualificado, emitido por certificador aprovado |
-| **Quantitativa** | *Quanto* pode deter? | Impossível na interface `Policy` (recebe endereço, não vê valor — saldo é commitment). A spec define o circuito `disclose_balance` (§9); **nunca foi implementado** | `circuits/disclose_balance_ge` + `velum-attest` — o titular prova *"minha posição ≥ limiar"* e um contrato verifica **sem que ninguém aprenda o valor** |
+Compliance asks two questions of a fund's register. OpenZeppelin's `stellar-contracts` ships the
+primitives for both, wired to neither.
 
-A verificação **on-chain** de disclosure é marcada como fora de escopo na spec deles (§§5.4, 14).
-Hoje toda disclosure é verificada off-chain, no navegador.
+| The question | Upstream today | Velum |
+|---|---|---|
+| **Who may hold?** | A flat **address allowlist**. No reason, no expiry, no attesting party — insufficient for a securities regime. Bridging to the RWA identity registry is their issue **#766**, open since 2026-07-06. | `velum-policy` — the token's authorization gate asks an **ERC-3643/T-REX identity registry**: does this holder carry a valid claim from an approved issuer? |
+| **How much may they hold?** | **Structurally impossible.** `is_authorized(account, token) -> bool` receives an address and never a value, because balances are Pedersen commitments. The RWA modules that enforce caps demand cleartext `amount: i128`. The two cannot meet. | `disclose_balance_ge` + `velum-attest` — the **holder** proves *"my position ≥ T"* and a Soroban contract verifies it on-chain. Nothing is decrypted; there is nothing to decrypt. |
 
-## Estado
+Under FHE a contract compares ciphertexts with no witness, so the check fits inside the transfer.
+Under Pedersen commitments a proof *needs* a witness — and for any balance, exactly one party holds
+it. So the check has to move: quantitative compliance cannot be transaction-gated, it must be
+**holder-attested**. That argument, with its evidence, is the whitepaper.
 
-| Entregável | Estado |
+---
+
+## What is ours, and what is not
+
+Velum runs on an **unmodified** upstream token. Nothing in `stellar-contracts` or in the reference
+demo was patched to make this work.
+
+**Ours** — everything in this repository:
+
+| Component | What it is |
 |---|---|
-| `contracts/velum-policy` — ponte identidade ↔ Confidential Token | ✅ compila (7.808 B) |
-| `circuits/disclose_balance_ge` — spec §9, o circuito que faltava | ✅ **10/10 testes; prova gerada em 0,25s e verificada** |
-| `contracts/velum-attest` — verificação on-chain da prova | ✅ **deployado em testnet e verificando provas reais** |
-| `experiments/circuit-cap-poc` — teto por operação no circuito de transfer | ✅ 34/34 testes, +3% de custo |
-| `experiments/clawback-poc` — premissa do clawback individual (whitepaper §11) | ✅ 5/5 testes — premissa verificada; seize parcial demonstrado |
-| `circuits/seize` — clawback individual: o circuito de enforcement | ✅ **11/11 testes; 93 opcodes; prova 0,33s verificada** |
-| Stack CT (verifier, auditor, token, allowlist, blocklist, factory) em testnet | ✅ deployada por nós; e2e verde em 1m4s |
-| Stack RWA (claim topics, claim issuer, identidade, registro) em testnet | 🟡 4 de 5 no ar; registro de identidade travado num formato de país |
-| Perfil `cvm175.json` · demo · README reproduzível · vídeo | ⬜ |
+| `contracts/velum-policy` | Adapter: the token's `Policy` gate → the RWA `IdentityVerifier`. Also **fails closed** on a registry misconfiguration upstream ignores silently (finding 6). |
+| `contracts/velum-attest` | On-chain verifier for position proofs — a component upstream's spec marks *out of scope* (§§5.4, 14). |
+| `circuits/disclose_balance_ge` | The predicate circuit upstream **specifies** (`SELECTIVE_DISCLOSURE.md` §9) **and does not ship**. No public implementation exists in any repository, branch, tag or history — see [provenance](docs/WHITEPAPER.md). |
+| `circuits/seize` | Answers upstream's open question on individual clawback: premise verified, circuit built, partial seizure demonstrated. |
+| `experiments/` | Two research artifacts: the clawback premise, and a quantitative rule inside upstream's transfer circuit (+3 % cost). |
+| `profiles/cvm175.json` | A jurisdiction as configuration — claim topics, thresholds, issuer controls — annotated with what is actually enforced and what is merely declared. |
+| `scripts/` | The two demos below. |
 
-Todos os números acima foram medidos nesta máquina, não estimados — ver `docs/WHITEPAPER.md` §8.
+**Theirs** — consumed as dependencies, never vendored into this repo: the Confidential Token, the
+RWA/T-REX module, the UltraHonk verifier, and the reference demo's SDK. Study clones live in
+`refs/` and are **git-ignored**, so nothing in this repository is someone else's code.
 
-## Por que importa
+---
 
-Posição exposta on-chain é a objeção nº 1 de instituições em blockchain pública. O CT resolve
-confidencialidade **sem** anonimato: endereços visíveis, valores cifrados, auditor designado
-enxerga tudo. Mas uma allowlist de endereços não atende CVM 175 — e nenhuma regra de valor é
-verificável quando o valor é um commitment. É essa lacuna que o Velum fecha.
+## Live on testnet
 
-Caso de uso âncora: FIDC tokenizado sob CVM 175 (Plina Finance) — o kit serve qualquer emissor
-regulado (FIDC, CRI/CRA, precatórios, LATAM em geral).
-
-## Documentos
-
-| Doc | O quê |
+| Contract | Address |
 |---|---|
-| **`docs/IMPLEMENTATION.md`** | **Registro de implementação** — endereços em testnet, hash da atestação, saídas de console, custos medidos e as duas falhas que custaram tempo |
-| **`docs/Velum-Deck.pdf`** | **Pitch deck (EN)** — 10 slides 16:9 para a apresentação no summit |
-| **`docs/Velum-OnePage.pdf`** | **One page (EN)** — a tese, o que foi construído, os números medidos e a citação upstream, em uma folha |
-| **`docs/WHITEPAPER.md`** | **Whitepaper técnico (EN)** — a tese "holder-attested compliance", arquitetura, avaliação medida, limitações, trabalho relacionado e o Apêndice A com evidência primária citada linha a linha |
-| `docs/SPIKE-CT-2026-08-04.md` | De-risk do pipeline + o achado que corrigiu a premissa do brief |
-| `circuits/README.md` | O circuito `disclose_balance_ge`: restrições, resultados, como reproduzir |
-| `docs/VALIDACAO-2026-08-04.md` | Primeira validação dos primitivos — **ler junto do SPIKE**, que corrige parte dela |
+| `velum-attest` | `CDEDFUYUNNQLU4C7ISKXJ26AIPIR42UJPW7XO72EZFEC3Y6VT6OO7LPK` |
+| `velum-policy` | `CDJET5BV36RDRNCNCNXJFYWUKPCX4VWXTUY4EGU4W5VUJ3FHLHIYFPKV` |
+| identity-gated confidential token | `CBDT4EKUF66MS7HHDHMLDPDI7TOPZCV7AYYLC53ES7TEB67KAT3BFWV5` |
 
-## Verificação de ineditismo
+Two transactions worth opening:
 
-`disclose_balance` / `_ge` / `_le` / `disclose_auditor` nunca foram implementados. Verificado em
-04–05/08/2026 por seis caminhos: busca full-text nos três clones · todas as 16 branches e 10 tags
-da OZ · histórico git completo (nunca existiu em commit algum) · mensagens de commit · issues e
-PRs (total=0) · busca de código autenticada em todo o GitHub.
+- **A position proved on-chain** — [`f8ff2951…c13267`](https://stellar.expert/explorer/testnet/tx/f8ff2951ad2277d4337b590842762a60ee46b8936d9c9014f5154a0918c13267).
+  A contract read the holder's commitment and viewing key from the token, the threshold from its own
+  profile, verified an UltraHonk proof, and recorded that the position clears 500 000 — without the
+  amount appearing anywhere.
+- **A wallet accepted by identity** — [`d9a1a33c…b78fd7`](https://stellar.expert/explorer/testnet/tx/d9a1a33cdadebd9f440c958a5557e29c7e030ad411e84335cb0307da1ab78fd7).
+  The wallet without a claim gets `#3602 NotAuthorizedByPolicy` instead.
 
-> Formulação segura para README e palco: *"não existe publicamente em nenhum repositório, branch,
-> tag ou histórico"*. **Não** afirmar "ninguém no mundo fez" — código privado da OZ é possível.
+Every address, hash and console output: **[`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md)**.
 
-## Achados para PR upstream
+---
 
-1. **`addr_f` não é legível por terceiros** — fica em instance storage e `address_to_field` é
-   `pub(crate)`, então um verificador externo não consegue lê-lo nem recomputá-lo. Um getter
-   público `address_as_field()` no `ConfidentialToken` resolveria.
-2. **Comando documentado que não roda** — `examples/rwa/sign-claim` está no `exclude` do
-   workspace mas declara `authors.workspace = true`; o `cargo run --manifest-path` do README
-   falha com *"failed to find a workspace root"*.
-3. **`--optimize=false`** no `deploy.ts` do demo é incompatível com stellar-cli ≥ 25.2, que
-   trata `--optimize` como flag booleana.
+## Run it yourself
 
-## Referências (clones em `refs/`, gitignorados)
+```bash
+# toolchain
+noirup --version 1.0.0-beta.11        # nargo
+bbup -v 0.87.0                        # bb (local circuit work only)
+# plus: stellar-cli >= 25.2, Rust with wasm32v1-none, Node >= 20, pnpm 10
 
-| Ref | O quê |
+# circuits — 66 tests across four packages
+cd circuits/disclose_balance_ge && nargo test      # 11
+cd ../seize && nargo test                          # 12
+cd ../../experiments/clawback-poc && nargo test    # 9
+
+# contracts
+cd ../../contracts && stellar contract build
+
+# the study clones the circuits path-depend on
+git clone -b feat/confidential-verifier-ultrahonk \
+  https://github.com/OpenZeppelin/stellar-contracts refs/oz-stellar-contracts-ct-branch
+git clone https://github.com/brozorec/stellar-confidential-token-demo refs/ct-demo
+cd refs/ct-demo && pnpm install && pnpm build:sdk
+```
+
+The two demos run against the deployed contracts above:
+
+```bash
+cd refs/ct-demo/packages/sdk
+
+# position proved and verified on-chain, plus the false claim that cannot be built
+VELUM_ATTEST=CDEDFUYUNNQLU4C7ISKXJ26AIPIR42UJPW7XO72EZFEC3Y6VT6OO7LPK \
+  pnpm exec tsx ../../../../scripts/demo-attest.ts
+
+# identity gating: one wallet with a claim, one without
+VELUM_TOKEN=CBDT4EKUF66MS7HHDHMLDPDI7TOPZCV7AYYLC53ES7TEB67KAT3BFWV5 \
+  pnpm exec tsx ../../../../scripts/demo-gate.ts
+```
+
+> Run `demo-attest.ts` without `VELUM_ATTEST` and it prints the verification key needed to deploy
+> your own `velum-attest`. **Derive that key from the same prover that will generate the proofs** —
+> the CLI and the SDK use different transcripts, and mixing them fails only at verification time.
+> That cost us an afternoon; §5 of the implementation record has the full diagnosis.
+
+---
+
+## Findings reported upstream
+
+Six, each with reproduction. Three are documentation or tooling; three are behavioural.
+
+1. **`addr_f` is not readable by third parties** — it lives in the token's instance storage and
+   `address_to_field` is `pub(crate)`, so an external verifier can neither read nor recompute it,
+   though the disclosure spec lists it as "recomputed from the token contract address".
+2. **A documented command that cannot run** — `examples/rwa/sign-claim` is in the workspace
+   `exclude` set while declaring `authors.workspace = true`.
+3. **`--optimize=false` breaks on stellar-cli ≥ 25.2**, which treats `--optimize` as a flag.
+4. **`examples/rwa/README.md` documents an impossible `initial_profiles` format** — the parameter is
+   type-erased `Vec<Val>`, so the CLI requires raw XDR-JSON.
+5. **`identity-registry` hardcodes `IdentityType::Individual`**, storing an organization as a
+   natural person.
+6. **A claim topic with no trusted issuer is silently ignored** — `verify_identity` skips it with no
+   error and no event, so an operator who tightens the rules and forgets the issuer gets **no
+   enforcement at all**. `velum-policy` fails closed on that state; the A/B demonstration is in the
+   implementation record.
+
+---
+
+## What we are not claiming
+
+- **Not production.** Developer-preview primitives; the UltraHonk verifier is unaudited. Testnet
+  only, no real value.
+- **Not finished.** The clawback migration — a register-circuit change and re-registration — is
+  designed and priced, not built.
+- **Not solved.** Predicates over **encrypted aggregates across accounts** (concentration by
+  tranche, subordination ratio between senior and subordinated) remain open, as far as we can
+  determine on any chain.
+- **Not invented.** We implement their specification. The novelty claim is bounded to what we can
+  verify: no *public* implementation exists in any repository, branch, tag or history. Private work
+  at OpenZeppelin cannot be excluded.
+
+---
+
+## Documents
+
+| Doc | What it is |
 |---|---|
-| `refs/oz-stellar-contracts-main` | OZ stellar-contracts `main` — módulos `confidential/` e `rwa/` |
-| `refs/oz-stellar-contracts-ct-branch` | Branch `feat/confidential-verifier-ultrahonk`, **checkout no rev pinado `539968f`** |
-| `refs/ct-demo` | `brozorec/stellar-confidential-token-demo` — SDK TS, app Next.js, indexer |
+| [`docs/Velum-Whitepaper-v0.1.pdf`](docs/Velum-Whitepaper-v0.1.pdf) | The thesis, architecture, evaluation, limits, and **Appendix A** sourcing every claim about upstream to a file and line |
+| [`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md) | Addresses, hashes, console output, measured costs — and the failures that cost us time |
+| [`docs/Velum-OnePage.pdf`](docs/Velum-OnePage.pdf) · [`docs/Velum-Deck.pdf`](docs/Velum-Deck.pdf) | One page; ten slides |
+| [`circuits/README.md`](circuits/README.md) | Both circuits: constraints, results, reproduction |
+| [`docs/SPIKE-CT-2026-08-04.md`](docs/SPIKE-CT-2026-08-04.md) | The de-risk that corrected our own first premise |
 
-Leituras-chave: `confidential/docs/{DESIGN,COMPLIANCE,SELECTIVE_DISCLOSURE,SDK,INDEXER}.md`,
-`rwa/mod.rs`, `examples/rwa/`.
-
-- Blog (dev preview, 2026-06-29): <https://stellar.org/blog/developers/developer-preview-confidential-tokens-on-stellar>
-- Docs de privacidade: <https://developers.stellar.org/docs/build/apps/privacy>
-- Bounty: <https://bounties.grantfox.xyz/events/stellar-summit-sp-2026>
-
-## Toolchain (versões que funcionam)
-
-`nargo 1.0.0-beta.11` · `bb 0.87.0` · `stellar-cli ≥ 25.2` · Rust + `wasm32v1-none` ·
-soroban-sdk `=26.1.0` · OZ rev `539968f158e0d779f584de2821090f715a3b25e1`.
-Noir **rejeita não-ASCII**, inclusive em comentário.
-
-## Regras do bounty (lembrete)
-
-Máx. 2 sub-lanes por time · presença física de todo o time · **trabalho 100% original**
-(por isso `refs/` fica fora do git — referências de estudo, não código submetido).
+Anchor case: a Brazilian receivables fund (FIDC) under CVM 175 — **Plina Finance**. The kit serves
+any regulated issuer facing the same paradox.
