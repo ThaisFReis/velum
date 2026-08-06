@@ -326,7 +326,7 @@ supplied by the prover, which is what makes the verdict mean anything: the autho
 
 ---
 
-## 5. Two failures worth recording
+## 5. Three failures worth recording
 
 Both cost real time and neither is in any documentation.
 
@@ -360,6 +360,28 @@ the SDK's `CircuitProver`, the same prover the token uses, and takes the VK from
 this: derive the VK from the same prover that will generate the proofs, never from the CLI.**
 
 ---
+
+### 5.3 The demos printed everything and then hung
+
+After `main()` returned, the process stayed alive. The scripts finish their output and simply never
+exit: `@aztec/bb.js` leaves worker handles open, so Node's event loop still has work and the run
+looks stalled at the exact moment it is actually done. It cost a wasted round of the stress suite,
+because a chained `demo && stress` never reached the second command.
+
+Fixed by exiting explicitly — but *after* stdout drains, which is the part worth writing down. A
+bare `process.exit()` at the end truncates the tail of a piped or redirected run, and the verification
+key these scripts print is 3 520 hex characters, so the truncation would be silent and the resulting
+deploy would fail later with an opaque proof error:
+
+```ts
+main()
+  .catch((e) => { console.error(e); process.exitCode = 1; })
+  .finally(() => process.stdout.write("", () => process.exit(process.exitCode ?? 0)));
+```
+
+Applied to all four scripts. A separate self-inflicted one from the same episode, for anyone
+debugging a hung run: `pkill -f "demo-attest.ts"` matches the shell whose own command line contains
+that string, so it kills itself. Use `pkill -f "demo-[a]ttest"`.
 
 ## 6. Findings reported upstream
 
@@ -458,7 +480,7 @@ Measured end to end on testnet, because it changes how the demo can be presented
 | Script | Real time | Where it goes |
 |---|---|---|
 | `demo-attest.ts` | **3 m 39 s** | transaction confirmation — register, deposit, merge, attest |
-| `demo-gate.ts` | **1 m 55 s** | same |
+| `demo-gate.ts` | **1 m 55 s** cold | same. A warm run is ~7 s: Alice is already registered, so it takes the deposit path |
 | `demo-seize.ts` | not separately timed | dominated by the same register → deposit → merge sequence |
 | the proof itself | **2.06 s** | the fast part |
 

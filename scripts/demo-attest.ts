@@ -197,4 +197,8 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// The bb.js prover leaves worker handles open, so the process does not exit on its own once
+// main() returns. Force it — but only after stdout has drained, or a piped run loses its tail.
+main()
+  .catch((e) => { console.error(e); process.exitCode = 1; })
+  .finally(() => process.stdout.write("", () => process.exit(process.exitCode ?? 0)));
