@@ -33,6 +33,26 @@
 //! than let the token reject the operation cleanly, so the call goes through the
 //! generated client's `try_` variant and the error is folded into `false`.
 //!
+//! ## Failing closed on a misconfigured registry
+//!
+//! Upstream's `verify_identity` walks `(claim_topic, issuers)` pairs and, for each, requires a
+//! valid claim from one of that topic's trusted issuers. A topic whose issuer list is **empty**
+//! never enters the inner loop, so it never raises — the topic is skipped in silence.
+//!
+//! The operational consequence is nasty: an operator who registers a claim topic to tighten the
+//! rules, and forgets to authorise an issuer for it, gets **no enforcement of that topic at all**,
+//! with no error, no event, and a registry that reads as if the rule were active. Every holder
+//! keeps passing.
+//!
+//! This adapter refuses to be the quiet half of that mistake. Before delegating, it reads the
+//! topic/issuer map and returns `false` if any registered topic has no issuer. A deployment in
+//! that state is not "permissive", it is **unconfigured** — and a compliance gate that cannot
+//! tell the difference should reject, not admit.
+//!
+//! The cost is two cross-contract reads per authorization check, on every gated operation. For a
+//! gate whose failure mode is silent under-enforcement, that is the right side to err on; a
+//! deployment that wants the cheaper path can pin the check to configuration time instead.
+//!
 //! ## What this policy does NOT enforce
 //!
 //! `is_authorized` receives an address and nothing else — no amount, no balance.
@@ -55,7 +75,9 @@ use stellar_access::ownable::{set_owner, Ownable};
 use stellar_macros::only_owner;
 use stellar_tokens::{
     confidential::compliance::Policy,
-    rwa::identity_verifier::IdentityVerifierClient,
+    rwa::identity_verification::{
+        claim_topics_and_issuers::ClaimTopicsAndIssuersClient, IdentityVerifierClient,
+    },
 };
 
 /// Instance-storage keys.
@@ -117,9 +139,20 @@ impl Policy for VelumPolicyContract {
     /// here.
     fn is_authorized(e: Env, account: Address, _token: Address) -> bool {
         let verifier = Self::identity_verifier(&e);
-        IdentityVerifierClient::new(&e, &verifier)
-            .try_verify_identity(&account)
-            .is_ok()
+        let verifier_client = IdentityVerifierClient::new(&e, &verifier);
+
+        // A registered topic with no trusted issuer is silently skipped upstream.
+        // Treat that as an unconfigured deployment and refuse, rather than
+        // reporting an authorization the registry never actually checked.
+        let cti = verifier_client.claim_topics_and_issuers();
+        let topics = ClaimTopicsAndIssuersClient::new(&e, &cti).get_claim_topics_and_issuers();
+        for (_topic, issuers) in topics.iter() {
+            if issuers.is_empty() {
+                return false;
+            }
+        }
+
+        verifier_client.try_verify_identity(&account).is_ok()
     }
 }
 

@@ -10,7 +10,7 @@
     "note": "Engineering intent, not legal advice. The mapping below is the subset a token can enforce; everything else lives in the fund's documents and its administrator."
   },
   "identity": {
-    "comment": "The qualitative half: who may hold. Enforced on every token operation via velum-policy, which asks the RWA identity verifier. IMPORTANT: a claim topic only takes effect when at least one trusted issuer is registered FOR THAT TOPIC. Registering the topic alone is a silent no-op — verify_identity iterates (topic, issuers) pairs and skips a topic whose issuer list is empty, with no error. Always pair a topic with its issuers here and on-chain.",
+    "comment": "The qualitative half: who may hold. Enforced on every token operation via velum-policy, which asks the RWA identity verifier. A claim topic only takes effect when at least one trusted issuer is registered FOR THAT TOPIC — upstream skips an issuer-less topic in silence. velum-policy fails closed on that state rather than reporting an authorization the registry never checked, so pairing a topic with its issuers is mandatory here and on-chain.",
     "claim_topics": [
       {
         "id": 1,
@@ -95,7 +95,7 @@
       "identity_registry": "CDG2WQ3CSIDHUB5CYHONFSSOQJ3GUUDVLWZUXUU7WEUITO2ZHDJSL25H",
       "claim_topics_and_issuers": "CB7ODYCJLLCWHMCYSZ6IUT3OQEQ5KEGX2OXNM3I2CIMI3IQ3QOTB226N",
       "identity_verifier": "CBZS626ZJMLC2ILCJCV4RLSLR7MZYBDEV7DNAEY5CZRKUFQQUPVH5M22",
-      "velum_policy": "CCCQ7Z6FYLCIXHBQDSIUJ46YMS63VDHY3ZM5ISGWGFJ5EXONOWOXQXDK",
+      "velum_policy": "CDJET5BV36RDRNCNCNXJFYWUKPCX4VWXTUY4EGU4W5VUJ3FHLHIYFPKV",
       "velum_attest": "CDEDFUYUNNQLU4C7ISKXJ26AIPIR42UJPW7XO72EZFEC3Y6VT6OO7LPK",
       "gated_token": "CBDT4EKUF66MS7HHDHMLDPDI7TOPZCV7AYYLC53ES7TEB67KAT3BFWV5"
     }

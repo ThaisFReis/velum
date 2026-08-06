@@ -14,7 +14,8 @@ Last run: **2026-08-05**. Network: **Stellar testnet**.
 | Contract | Address | Notes |
 |---|---|---|
 | `velum-attest` | `CDEDFUYUNNQLU4C7ISKXJ26AIPIR42UJPW7XO72EZFEC3Y6VT6OO7LPK` | 36 937 B wasm. Constructor: owner, token, `addr_f`, VK, threshold=500 000 |
-| `velum-policy` | `CCCQ7Z6FYLCIXHBQDSIUJ46YMS63VDHY3ZM5ISGWGFJ5EXONOWOXQXDK` | 7 808 B wasm. Delegates to the identity verifier below |
+| `velum-policy` | `CDJET5BV36RDRNCNCNXJFYWUKPCX4VWXTUY4EGU4W5VUJ3FHLHIYFPKV` | 8 101 B wasm. Delegates to the identity verifier, and fails closed on an issuer-less topic (§6.3). The gated token points here |
+| `velum-policy` (v1, superseded) | `CCCQ7Z6FYLCIXHBQDSIUJ46YMS63VDHY3ZM5ISGWGFJ5EXONOWOXQXDK` | 7 808 B. Kept deployed as the control in the A/B below |
 | identity-gated token | `CBDT4EKUF66MS7HHDHMLDPDI7TOPZCV7AYYLC53ES7TEB67KAT3BFWV5` | Confidential token deployed through upstream's factory, bound to `velum-policy`, `sac_passthrough: true` |
 
 ### Confidential-token stack (upstream code, deployed by us)
@@ -302,6 +303,29 @@ corrections came out of the audit:
   configuration event, which is exactly the mistake this section exists to prevent.
 - **Claim topic 2 earned one.** Not because it is active — it is not — but because we proved the
   switch works, in both directions, and restored the state afterwards.
+
+## 6.3 The silent-non-enforcement footgun, and our fix
+
+Finding 6 above is not just a report: `velum-policy` now defends against it. Before delegating,
+the adapter reads the topic/issuer map and returns `false` if any registered topic has no issuer.
+A deployment in that state is not permissive, it is **unconfigured**, and a compliance gate that
+cannot tell the difference should reject.
+
+Demonstrated A/B against the same chain state — topic 2 registered, no issuer bound to it:
+
+| Policy | `is_authorized(alice)` | Meaning |
+|---|---|---|
+| v1, `CCCQ7Z6F…QXDK` | `true` | the topic is silently unenforced; the holder passes a check that never ran |
+| v2, `CDJET5BV…FPKV` | `false` | refuses, because the registry cannot answer what it claims to enforce |
+
+With the registry correctly configured, both return `true` — the guard costs nothing in the
+healthy case. State was restored after the test, and the gated token now points at v2
+(`ComplianceConfigChanged`); `demo-gate.ts` reproduces unchanged.
+
+**The cost:** two extra cross-contract reads per authorization, on every gated operation. For a
+gate whose failure mode is silent under-enforcement, that is the right side to err on. A
+deployment that wants the cheaper path can move the check to configuration time — at the price of
+going stale when the registry changes.
 
 ## 7. Toolchain
 
