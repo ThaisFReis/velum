@@ -327,6 +327,20 @@ gate whose failure mode is silent under-enforcement, that is the right side to e
 deployment that wants the cheaper path can move the check to configuration time — at the price of
 going stale when the registry changes.
 
+## 6.4 Wall-clock cost of the demos
+
+Measured end to end on testnet, because it changes how the demo can be presented:
+
+| Script | Real time | Where it goes |
+|---|---|---|
+| `demo-attest.ts` | **3 m 39 s** | transaction confirmation — register, deposit, merge, attest |
+| `demo-gate.ts` | **1 m 55 s** | same |
+| the proof itself | **2.06 s** | the fast part |
+
+Proving is not the bottleneck; testnet confirmation is. A three-minute video cannot run both live,
+so `docs/VIDEO-SCRIPT.md` records each separately and speeds up the waiting visibly rather than
+cutting it — the honest edit, not the flattering one.
+
 ## 7. Toolchain
 
 `nargo 1.0.0-beta.11` · `bb 0.87.0` (CLI, for local circuit work only) · `@aztec/bb.js 0.87.0`
